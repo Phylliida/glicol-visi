@@ -1,0 +1,258 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #1a1a1a;
+    color: #e0e0e0;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+#app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+#toolbar {
+    background: #252525;
+    padding: 1rem;
+    border-bottom: 2px solid #333;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.toolbar-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+#toolbar h1 {
+    font-size: 1.5rem;
+    margin: 0;
+    color: #4a9eff;
+}
+
+.toolbar-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.action-btn {
+    padding: 0.4rem 0.8rem;
+    background: #4a9eff;
+    border: none;
+    border-radius: 4px;
+    color: white;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.action-btn:hover {
+    background: #3a8eef;
+}
+
+.status {
+    font-size: 0.85rem;
+    color: #999;
+    min-width: 100px;
+}
+
+#node-palette {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.add-node {
+    padding: 0.5rem 1rem;
+    background: #3a3a3a;
+    border: 1px solid #555;
+    border-radius: 4px;
+    color: #e0e0e0;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.add-node:hover {
+    background: #4a4a4a;
+    border-color: #4a9eff;
+}
+
+#canvas-container {
+    position: relative;
+    flex: 1;
+    overflow: hidden;
+    background: #2a2a2a;
+    background-image:
+        linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+#connections-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+#connections-layer > * {
+    pointer-events: auto;
+}
+
+#nodes-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.node {
+    position: absolute;
+    background: #1e1e1e;
+    border: 2px solid #444;
+    border-radius: 8px;
+    padding: 0.75rem;
+    min-width: 150px;
+    cursor: move;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    transition: border-color 0.2s;
+}
+
+.node:hover {
+    border-color: #4a9eff;
+}
+
+.node.dragging {
+    opacity: 0.8;
+    border-color: #4a9eff;
+}
+
+.node-header {
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+    color: #4a9eff;
+    text-align: center;
+    font-size: 0.9rem;
+}
+
+.node-ports {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.5rem;
+}
+
+.port {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid #666;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+}
+
+.port:hover {
+    transform: scale(1.3);
+}
+
+.port.input {
+    background: #4a9eff;
+    border-color: #4a9eff;
+}
+
+.port.output {
+    background: #ff6b6b;
+    border-color: #ff6b6b;
+}
+
+.port.connecting {
+    animation: pulse 0.5s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.4); }
+}
+
+.inputs, .outputs {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.port-container {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.port-label {
+    font-size: 0.75rem;
+    color: #999;
+}
+
+.inputs .port-container {
+    flex-direction: row;
+}
+
+.outputs .port-container {
+    flex-direction: row-reverse;
+}
+
+/* Connection styling */
+.connection-hitbox {
+    stroke: transparent;
+    stroke-width: 12;
+    fill: none;
+    pointer-events: stroke;
+    cursor: crosshair;
+}
+
+.connection {
+    stroke: #4a9eff;
+    stroke-width: 2;
+    fill: none;
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+g:has(.connection-hitbox) {
+    cursor: crosshair;
+}
+
+.connection-hitbox:hover {
+    cursor: crosshair;
+}
+
+g:hover .connection {
+    stroke-width: 3;
+    opacity: 1;
+    stroke: #ff6b6b;
+}
+
+.connection-hitbox:hover ~ .connection {
+    stroke-width: 3;
+    opacity: 1;
+    stroke: #ff6b6b;
+}
+
+.temp-connection {
+    stroke: #4a9eff;
+    stroke-width: 2;
+    fill: none;
+    opacity: 0.4;
+    stroke-dasharray: 5, 5;
+}
