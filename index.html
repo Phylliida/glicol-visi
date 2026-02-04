@@ -3,14 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Glicol Visual Editor</title>
+    <title>Strudel Visual Editor</title>
+    <script src="https://unpkg.com/@strudel/repl@latest"></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div id="app">
         <div id="toolbar">
             <div class="toolbar-row">
-                <h1>Glicol Visual Editor</h1>
+                <h1>Strudel Visual Editor</h1>
                 <div class="toolbar-actions">
                     <button id="save-btn" class="action-btn">Save Now</button>
                     <button id="history-btn" class="action-btn">View History</button>
@@ -18,6 +19,7 @@
                 </div>
             </div>
             <div id="node-palette">
+                <button class="add-node" data-type="text">+ Text</button>
                 <button class="add-node" data-type="notes">+ Notes</button>
                 <button class="add-node" data-type="code">+ Code</button>
             </div>
@@ -28,8 +30,12 @@
                 <div id="nodes-layer"></div>
             </div>
             <div id="code-panel">
+                <div class="panel-controls">
+                    <button class="action-btn" id="play-btn">Play</button>
+                    <button class="action-btn" id="update-btn">Update</button>
+                </div>
                 <div class="panel-header">Code Nodes</div>
-                <textarea id="code-panel-text" readonly placeholder="Code node contents will appear here"></textarea>
+                <strudel-editor></strudel-editor>
             </div>
         </div>
     </div>

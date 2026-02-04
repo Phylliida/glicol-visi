@@ -3,16 +3,22 @@
 // ============================================================================
 
 const NODE_TYPES = {
+    text: {
+        name: 'Text',
+        inputs: [],
+        outputs: ['text'],
+        settings: [{ key: 'text', label: 'text', title: 'text' }]
+    },
     code: {
         name: 'Code',
-        inputs: [],
-        outputs: ['code'],
+        inputs: ['inputs'],
+        outputs: ['callers', 'code'],
         settings: [{ key: 'code', label: 'code', title: 'code' }]
     },
     notes: {
         name: 'Notes',
-        inputs: ['pulse'],
-        outputs: ['pulse'],
+        inputs: [],
+        outputs: ['tuning'],
         settings: [
             { key: 'tuning', label: 'tuning', title: 'tuning' }
         ]
@@ -65,6 +71,16 @@ const hasIncomingConnection = (nodeId, portIndex) =>
         (conn) => conn.toNodeId === nodeId && conn.toPortIndex === portIndex
     );
 
+const updateSettingFieldDom = (nodeId, portIndex, value) => {
+    const nodeEl = document.querySelector(`[data-node-id="${nodeId}"]`);
+    if (!nodeEl) return;
+
+    const field = nodeEl.querySelector(`.setting-field[data-port-index="${portIndex}"]`);
+    if (!field || field === document.activeElement) return;
+
+    field.value = value ?? '';
+};
+
 const getInputDefinitions = (config) => {
     const baseInputs = (config.inputs || []).map(input =>
         typeof input === 'string' ? { label: input } : input
@@ -77,6 +93,31 @@ const getInputDefinitions = (config) => {
     }));
 
     return [...baseInputs, ...settingInputs];
+};
+
+const deleteNode = (nodeId) => {
+    if (!state.nodes.has(nodeId)) return;
+
+    state.nodes.delete(nodeId);
+
+    if (state.draggedNode === nodeId) {
+        state.draggedNode = null;
+        state.dragOffset = { x: 0, y: 0 };
+    }
+
+    if (state.connectingPort && state.connectingPort.nodeId === nodeId) {
+        state.connectingPort = null;
+        state.tempConnectionEnd = null;
+    }
+
+    for (const [connId, conn] of Array.from(state.connections.entries())) {
+        if (conn.fromNodeId === nodeId || conn.toNodeId === nodeId) {
+            state.connections.delete(connId);
+        }
+    }
+
+    render();
+    autoSave();
 };
 
 // ============================================================================
@@ -115,6 +156,7 @@ const propagateValuesFrom = (startNodeId) => {
                 ensureNodeSettings(targetNode);
                 if (targetNode.settings[inputDef.settingKey] !== fromValue) {
                     targetNode.settings[inputDef.settingKey] = fromValue;
+                    updateSettingFieldDom(targetNode.id, conn.toPortIndex, fromValue);
                     changed = true;
                 }
             }
@@ -164,7 +206,44 @@ const createNodeElement = (node) => {
 
     const header = document.createElement('div');
     header.className = 'node-header';
-    header.textContent = config.name;
+    const title = document.createElement('span');
+    title.className = 'node-title';
+    title.textContent = config.name;
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'node-delete';
+    deleteBtn.textContent = '×';
+    deleteBtn.title = 'Delete node';
+
+    const confirmBox = document.createElement('div');
+    confirmBox.className = 'node-delete-confirm hidden';
+    confirmBox.innerHTML = `
+        <div class="confirm-text">Delete?</div>
+        <div class="confirm-actions">
+            <button class="confirm-yes">Yes</button>
+            <button class="confirm-no">No</button>
+        </div>
+    `;
+
+    deleteBtn.addEventListener('mousedown', (evt) => evt.stopPropagation());
+    confirmBox.addEventListener('mousedown', (evt) => evt.stopPropagation());
+
+    deleteBtn.addEventListener('click', (evt) => {
+        evt.stopPropagation();
+        confirmBox.classList.toggle('hidden');
+    });
+
+    confirmBox.querySelector('.confirm-yes').addEventListener('click', (evt) => {
+        evt.stopPropagation();
+        deleteNode(node.id);
+    });
+
+    confirmBox.querySelector('.confirm-no').addEventListener('click', (evt) => {
+        evt.stopPropagation();
+        confirmBox.classList.add('hidden');
+    });
+
+    header.append(title, deleteBtn, confirmBox);
     nodeEl.appendChild(header);
 
     const portsContainer = document.createElement('div');
@@ -194,6 +273,8 @@ const createNodeElement = (node) => {
             const field = document.createElement('input');
             field.type = 'text';
             field.className = 'setting-field';
+            field.dataset.portIndex = i;
+            field.dataset.settingKey = def.settingKey;
             const connected = hasIncomingConnection(node.id, i);
             field.disabled = connected;
             field.placeholder = connected ? 'from input' : '';
@@ -263,13 +344,95 @@ const createConnection = (conn, fromPos, toPos) => {
 // SIDE PANEL
 // ============================================================================
 
-const updateCodePanel = () => {
-    const textArea = document.getElementById('code-panel-text');
-    if (!textArea) return;
+const isUpstream = (sourceId, targetId) => {
+    if (sourceId === targetId) return false;
+    const visited = new Set();
+    const stack = [sourceId];
 
-    const lines = Array.from(state.nodes.values())
-        .filter(node => node.type === 'code')
+    while (stack.length) {
+        const current = stack.pop();
+        if (visited.has(current)) continue;
+        visited.add(current);
+
+        for (const conn of state.connections.values()) {
+            if (conn.fromNodeId !== current) continue;
+            const next = conn.toNodeId;
+            if (next === targetId) return true;
+            stack.push(next);
+        }
+    }
+
+    return false;
+};
+
+const buildComponentMap = () => {
+    const adjacency = new Map();
+    for (const nodeId of state.nodes.keys()) adjacency.set(nodeId, []);
+    for (const conn of state.connections.values()) {
+        if (!adjacency.has(conn.fromNodeId) || !adjacency.has(conn.toNodeId)) continue;
+        adjacency.get(conn.fromNodeId).push(conn.toNodeId);
+        adjacency.get(conn.toNodeId).push(conn.fromNodeId);
+    }
+
+    const compMap = new Map();
+    let nextId = 0;
+    for (const nodeId of adjacency.keys()) {
+        if (compMap.has(nodeId)) continue;
+        const stack = [nodeId];
+        while (stack.length) {
+            const current = stack.pop();
+            if (compMap.has(current)) continue;
+            compMap.set(current, nextId);
+            for (const neighbor of adjacency.get(current)) {
+                stack.push(neighbor);
+            }
+        }
+        nextId++;
+    }
+
+    return compMap;
+};
+
+const updateCodePanel = () => {
+    const strudelEditor = document.querySelector('strudel-editor');
+    if (!strudelEditor) return;
+
+    const componentMap = buildComponentMap();
+    const codeNodes = Array.from(state.nodes.values()).filter(node => node.type === 'code');
+
+    const componentMeta = new Map();
+    codeNodes.forEach(node => {
+        const compId = componentMap.get(node.id) ?? node.id;
+        const meta = componentMeta.get(compId) ?? {
+            minY: node.y ?? 0,
+            minX: node.x ?? 0,
+            minId: parseIdNumber(node.id)
+        };
+        meta.minY = Math.min(meta.minY, node.y ?? 0);
+        meta.minX = Math.min(meta.minX, node.x ?? 0);
+        meta.minId = Math.min(meta.minId, parseIdNumber(node.id));
+        componentMeta.set(compId, meta);
+    });
+
+    const orderedComponents = Array.from(componentMeta.entries()).sort(([, a], [, b]) => {
+        const yDiff = a.minY - b.minY;
+        if (yDiff !== 0) return yDiff;
+        const xDiff = a.minX - b.minX;
+        if (xDiff !== 0) return xDiff;
+        return a.minId - b.minId;
+    });
+
+    const componentOrder = new Map(orderedComponents.map(([id], index) => [id, index]));
+
+    const codeText = codeNodes
         .sort((a, b) => {
+            const compA = componentMap.get(a.id) ?? a.id;
+            const compB = componentMap.get(b.id) ?? b.id;
+            if (compA !== compB) {
+                return (componentOrder.get(compA) ?? 0) - (componentOrder.get(compB) ?? 0);
+            }
+            if (isUpstream(a.id, b.id)) return -1;
+            if (isUpstream(b.id, a.id)) return 1;
             const yDiff = (a.y ?? 0) - (b.y ?? 0);
             if (yDiff !== 0) return yDiff;
             const xDiff = (a.x ?? 0) - (b.x ?? 0);
@@ -277,11 +440,22 @@ const updateCodePanel = () => {
             return parseIdNumber(a.id) - parseIdNumber(b.id);
         })
         .map(node => {
-            const codeText = node.settings?.code ?? node.value ?? '';
-            return String(codeText).replace(/\r?\n/g, ' ');
-        });
+            const codeValue = node.settings?.code ?? node.value ?? '';
+            return String(codeValue).replace(/\r?\n/g, ' ');
+        })
+        .join('\n');
 
-    textArea.value = lines.join('\n');
+    if (strudelEditor.getAttribute('code') !== codeText) {
+        strudelEditor.setAttribute('code', codeText);
+    }
+
+    // The strudel component renders into a sibling container; ensure it fills the panel.
+    const replContainer = strudelEditor.nextElementSibling;
+    if (replContainer) {
+        replContainer.style.flex = '1';
+        replContainer.style.display = 'flex';
+        replContainer.style.minHeight = '0';
+    }
 };
 
 // ============================================================================
