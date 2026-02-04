@@ -27,6 +27,16 @@ body {
     min-height: 0;
 }
 
+#resize-handle {
+    width: 8px;
+    cursor: col-resize;
+    background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.05) 50%, transparent 100%);
+}
+
+#resize-handle:hover {
+    background: linear-gradient(90deg, transparent 0%, rgba(74, 158, 255, 0.2) 50%, transparent 100%);
+}
+
 #toolbar {
     background: #252525;
     padding: 1rem;

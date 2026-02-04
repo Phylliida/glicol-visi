@@ -72,3 +72,20 @@ http://localhost:5000
 - `GET /api/patch/<uuid>/history` - Get patch history
 - `GET /api/patch/<uuid>/children` - Get forked versions
 - `GET /api/patches` - Get all patches (debug)
+
+## Appendix: Calculus of Inductive Constructions (CIC) — First-Principles Primer
+
+This project mentions Lean; Lean’s logical foundation is the Calculus of Inductive Constructions. Here’s a ground‑up sketch of how CIC works and why it’s trusted.
+
+- **Terms and types are unified**: Everything is a term, and every term has a type. Functions can return types and take types as inputs. The notation `Π (x : A), B x` is both “for all x in A, B x holds” and “a function that, given x : A, produces a term of type B x.”
+- **Propositions as types**: Logical propositions live in the special universe `Prop`; a proof of `P` is just a term of type `P`. If you can type‑check a term `t : P`, you have proved `P`.
+- **Universes prevent paradoxes**: Types themselves live in an infinite hierarchy `Type 0, Type 1, …`; this stratification avoids Girard’s paradox (no `Type : Type`).
+- **Inductive types add data and reasoning principles**: Declaring an inductive (e.g., natural numbers) simultaneously introduces:
+  - Constructors (e.g., `zero`, `succ`) that build data.
+  - A recursor/eliminator that specifies how to consume the data by recursion/induction. For `Nat`, this is the familiar primitive “define on `zero` and on `succ n` given a result for `n`.”
+- **Computation is definitional equality**: The kernel reduces terms by β (function application), δ (unfold definitions), ι (match on constructors), and ζ (let‑unfolding) to decide whether two terms are definitionally equal. Proof checking boils down to verifying types and these reductions.
+- **Safety boundary — the kernel**: All of Lean sits atop a tiny, trusted kernel that only knows: (1) type formation rules (Π, universes), (2) inductive declarations, and (3) the reduction rules above. Anything not justified inside the kernel—tactics, automation, compilation—is untrusted scaffolding.
+- **Termination & consistency**: Recursive definitions must be accepted by the kernel’s termination checker (structural or well‑founded). This blocks non‑terminating terms from inhabiting `False`, preserving consistency.
+- **Extraction angle**: Because proofs are programs, you can erase proof‑only parts (terms in `Prop`) and keep computational content in `Type`, yielding certified programs from constructive proofs.
+
+Takeaway: CIC supplies a minimal, programmable core (dependent functions + inductives + universes); Lean’s user‑friendly features (`match`, tactics, automation) compile down to this small kernel, which is the only part you must trust.

@@ -43,7 +43,8 @@ const state = {
     draggedNode: null,
     dragOffset: { x: 0, y: 0 },
     connectingPort: null,
-    tempConnectionEnd: null
+    tempConnectionEnd: null,
+    resizing: null
 };
 
 const ensureNodeSettings = (node) => {
@@ -458,6 +459,8 @@ const updateCodePanel = () => {
     }
 };
 
+const getStrudelRepl = () => document.querySelector('strudel-editor')?.editor;
+
 // ============================================================================
 // RENDERING
 // ============================================================================
@@ -559,6 +562,15 @@ const onPortMouseDown = (e) => {
 };
 
 const onMouseMove = (e) => {
+    if (state.resizing) {
+        const { startX, startWidth, panel } = state.resizing;
+        const delta = e.clientX - startX;
+        const newWidth = Math.max(180, startWidth - delta);
+        panel.style.width = `${newWidth}px`;
+        e.preventDefault();
+        return;
+    }
+
     const containerRect = document.getElementById('canvas-container').getBoundingClientRect();
     const mousePos = {
         x: e.clientX - containerRect.left,
@@ -587,6 +599,12 @@ const onMouseMove = (e) => {
 };
 
 const onMouseUp = (e) => {
+    if (state.resizing) {
+        state.resizing = null;
+        document.body.style.cursor = '';
+        return;
+    }
+
     let shouldSave = false;
     let shouldRender = false;
 
@@ -755,6 +773,21 @@ const init = async () => {
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
 
+    // Resize code panel
+    const resizeHandle = document.getElementById('resize-handle');
+    const codePanel = document.getElementById('code-panel');
+    if (resizeHandle && codePanel) {
+        resizeHandle.addEventListener('mousedown', (e) => {
+            state.resizing = {
+                startX: e.clientX,
+                startWidth: codePanel.offsetWidth,
+                panel: codePanel
+            };
+            document.body.style.cursor = 'col-resize';
+            e.preventDefault();
+        });
+    }
+
     // Toolbar: Add node buttons
     document.querySelectorAll('.add-node').forEach(button => {
         button.addEventListener('click', () => {
@@ -778,6 +811,19 @@ const init = async () => {
 
     // Toolbar: History button
     document.getElementById('history-btn').addEventListener('click', showHistory);
+
+    // Code panel: Play/Update buttons
+    document.getElementById('play-btn').addEventListener('click', async () => {
+        const repl = getStrudelRepl();
+        if (!repl) return;
+        await repl.evaluate(true);
+    });
+
+    document.getElementById('update-btn').addEventListener('click', async () => {
+        const repl = getStrudelRepl();
+        if (!repl) return;
+        await repl.evaluate(false);
+    });
 
     // Load from URL or create demo nodes
     const hash = window.location.hash.slice(1);
