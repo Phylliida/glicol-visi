@@ -42,6 +42,8 @@ const state = {
     connections: new Map(),
     draggedNode: null,
     dragOffset: { x: 0, y: 0 },
+    canvasOffset: { x: 0, y: 0 },
+    panning: null,
     connectingPort: null,
     tempConnectionEnd: null,
     resizing: null
@@ -202,8 +204,8 @@ const createNodeElement = (node) => {
     const nodeEl = document.createElement('div');
     nodeEl.className = 'node';
     nodeEl.dataset.nodeId = node.id;
-    nodeEl.style.left = `${node.x}px`;
-    nodeEl.style.top = `${node.y}px`;
+    nodeEl.style.left = `${node.x + state.canvasOffset.x}px`;
+    nodeEl.style.top = `${node.y + state.canvasOffset.y}px`;
 
     const header = document.createElement('div');
     header.className = 'node-header';
@@ -468,6 +470,11 @@ const getStrudelRepl = () => document.querySelector('strudel-editor')?.editor;
 const render = () => {
     const nodesLayer = document.getElementById('nodes-layer');
     const connectionsLayer = document.getElementById('connections-layer');
+    const canvas = document.getElementById('canvas-container');
+
+    if (canvas) {
+        canvas.style.backgroundPosition = `${state.canvasOffset.x}px ${state.canvasOffset.y}px`;
+    }
 
     // Clear
     nodesLayer.innerHTML = '';
@@ -531,6 +538,23 @@ const render = () => {
 // EVENT HANDLERS
 // ============================================================================
 
+const onCanvasMouseDown = (e) => {
+    if (e.button !== 0) return;
+
+    // Ignore when interacting with nodes, ports, or existing connections.
+    if (e.target.closest('.node') || e.target.closest('.port') || e.target.closest('g[data-connection-id]')) {
+        return;
+    }
+
+    state.panning = {
+        startX: e.clientX,
+        startY: e.clientY,
+        origin: { ...state.canvasOffset }
+    };
+    document.body.style.cursor = 'grabbing';
+    e.preventDefault();
+};
+
 const onNodeMouseDown = (e) => {
     if (e.target.classList.contains('port')) return;
 
@@ -571,6 +595,15 @@ const onMouseMove = (e) => {
         return;
     }
 
+    if (state.panning) {
+        const dx = e.clientX - state.panning.startX;
+        const dy = e.clientY - state.panning.startY;
+        state.canvasOffset.x = state.panning.origin.x + dx;
+        state.canvasOffset.y = state.panning.origin.y + dy;
+        render();
+        return;
+    }
+
     const containerRect = document.getElementById('canvas-container').getBoundingClientRect();
     const mousePos = {
         x: e.clientX - containerRect.left,
@@ -583,8 +616,8 @@ const onMouseMove = (e) => {
     if (state.draggedNode) {
         const node = state.nodes.get(state.draggedNode);
         if (node) {
-            node.x = mousePos.x - state.dragOffset.x;
-            node.y = mousePos.y - state.dragOffset.y;
+            node.x = mousePos.x - state.canvasOffset.x - state.dragOffset.x;
+            node.y = mousePos.y - state.canvasOffset.y - state.dragOffset.y;
             changed = true;
         }
     }
@@ -601,6 +634,12 @@ const onMouseMove = (e) => {
 const onMouseUp = (e) => {
     if (state.resizing) {
         state.resizing = null;
+        document.body.style.cursor = '';
+        return;
+    }
+
+    if (state.panning) {
+        state.panning = null;
         document.body.style.cursor = '';
         return;
     }
@@ -772,6 +811,10 @@ const init = async () => {
     // Global mouse handlers
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
+    const canvas = document.getElementById('canvas-container');
+    if (canvas) {
+        canvas.addEventListener('mousedown', onCanvasMouseDown);
+    }
 
     // Resize code panel
     const resizeHandle = document.getElementById('resize-handle');
