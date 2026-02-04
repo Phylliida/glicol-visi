@@ -267,21 +267,48 @@ class GlicolUITester:
 
     async def remove_connection(self, connection_index: int = 0):
         """Remove a connection by clicking on it"""
-        print(f"🗑️  Removing connection {connection_index}...")
+        print(f"🗑️  Clicking connection {connection_index} to remove it...")
 
-        # Get all connection elements
+        # Get all connection group elements
         connections = await self.page.select_all("g[data-connection-id]")
 
         if connection_index >= len(connections):
             print(f"❌ Connection index {connection_index} out of range (only {len(connections)} connections)")
             return False
 
-        # Click on the connection to remove it
         connection = connections[connection_index]
-        await connection.click()
+
+        # Get the connection ID for debug output
+        conn_id = await self.page.evaluate(f"""
+            (function() {{
+                const conns = document.querySelectorAll('g[data-connection-id]');
+                return conns[{connection_index}].dataset.connectionId;
+            }})()
+        """)
+
+        print(f"   Clicking connection: {conn_id}")
+
+        # Dispatch a click event on the connection to trigger removal
+        # Need to use JavaScript to properly trigger the event handler
+        await self.page.evaluate(f"""
+            (function() {{
+                const conns = document.querySelectorAll('g[data-connection-id]');
+                const conn = conns[{connection_index}];
+
+                // Create and dispatch a click event
+                const clickEvent = new MouseEvent('click', {{
+                    bubbles: true,
+                    cancelable: true,
+                    view: window
+                }});
+
+                conn.dispatchEvent(clickEvent);
+            }})()
+        """)
+
         await asyncio.sleep(0.3)
 
-        print(f"✅ Connection removed")
+        print(f"✅ Connection clicked (should be removed)")
         return True
 
     async def click_save_button(self):
@@ -337,9 +364,9 @@ async def test_basic_ui_load():
     await tester.setup()
 
     try:
-        # Check initial node count (should have 3 demo nodes)
+        # Check initial node count (should have 2 demo nodes)
         initial_count = await tester.get_node_count()
-        assert initial_count == 3, f"Expected 3 demo nodes, got {initial_count}"
+        assert initial_count == 2, f"Expected 2 demo nodes, got {initial_count}"
 
         await tester.screenshot("test1_initial_load.png")
 
@@ -361,8 +388,8 @@ async def test_add_nodes():
     try:
         initial_count = await tester.get_node_count()
 
-        # Add an envelope node
-        await tester.click_add_node_button("envelope")
+        # Add a code node
+        await tester.click_add_node_button("code")
 
         # Verify node count increased
         new_count = await tester.get_node_count()
@@ -439,7 +466,7 @@ async def test_save_and_hash():
         initial_hash = await tester.get_current_hash()
 
         # Make a change (add a node)
-        await tester.click_add_node_button("oscillator")
+        await tester.click_add_node_button("code")
         await asyncio.sleep(1.5)  # Wait for auto-save
 
         # Check if hash was created
@@ -447,6 +474,41 @@ async def test_save_and_hash():
         assert new_hash != "", "Expected hash to be created after auto-save"
 
         print(f"✅ TEST 5 PASSED: Auto-save created hash: {new_hash}")
+
+    finally:
+        await tester.teardown()
+
+
+async def test_remove_connection():
+    """Test 6: Removing connections by clicking them"""
+    print("\n" + "="*60)
+    print("TEST 6: Removing Connections")
+    print("="*60)
+
+    tester = GlicolUITester()
+    await tester.setup()
+
+    try:
+        # Create a connection first
+        initial_connections = await tester.get_connection_count()
+        await tester.create_connection(0, 0)
+
+        # Verify connection was created
+        after_create = await tester.get_connection_count()
+        assert after_create == initial_connections + 1, \
+            f"Expected {initial_connections + 1} connections after create, got {after_create}"
+
+        # Remove the connection
+        await tester.remove_connection(0)
+
+        # Verify connection was removed
+        after_remove = await tester.get_connection_count()
+        assert after_remove == initial_connections, \
+            f"Expected {initial_connections} connections after remove, got {after_remove}"
+
+        await tester.screenshot("test6_connection_removed.png")
+
+        print("✅ TEST 6 PASSED: Connection removed successfully")
 
     finally:
         await tester.teardown()
@@ -488,6 +550,7 @@ async def run_all_tests():
         test_drag_nodes,
         test_create_connections,
         test_save_and_hash,
+        test_remove_connection,
     ]
 
     passed = 0

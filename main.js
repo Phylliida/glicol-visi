@@ -3,14 +3,29 @@
 // ============================================================================
 
 const NODE_TYPES = {
-    oscillator: { name: 'Oscillator', inputs: [], outputs: ['out'] },
-    filter: { name: 'Filter', inputs: ['in', 'freq'], outputs: ['out'] },
-    envelope: { name: 'Envelope', inputs: [], outputs: ['out'] },
+    code: {
+        name: 'Code',
+        inputs: [],
+        outputs: ['code'],
+        settings: [{ key: 'code', label: 'code', title: 'code' }]
+    },
+    notes: {
+        name: 'Notes',
+        inputs: ['pulse'],
+        outputs: ['pulse'],
+        settings: [
+            { key: 'tuning', label: 'tuning', title: 'tuning' }
+        ]
+    },
     output: { name: 'Output', inputs: ['in'], outputs: [] }
 };
 
 let idCounter = 0;
 const generateId = (prefix) => `${prefix}_${++idCounter}`;
+const parseIdNumber = (id) => {
+    const match = /_(\d+)$/.exec(id);
+    return match ? parseInt(match[1], 10) : 0;
+};
 
 // ============================================================================
 // STATE
@@ -23,6 +38,90 @@ const state = {
     dragOffset: { x: 0, y: 0 },
     connectingPort: null,
     tempConnectionEnd: null
+};
+
+const ensureNodeSettings = (node) => {
+    const config = NODE_TYPES[node.type];
+    if (!config || !config.settings) return;
+
+    if (!node.settings) node.settings = {};
+    config.settings.forEach(setting => {
+        if (node.settings[setting.key] === undefined) {
+            node.settings[setting.key] = '';
+        }
+    });
+
+    if (node.value === undefined && config.settings.length) {
+        const firstKey = config.settings[0].key;
+        const initialValue = node.settings[firstKey];
+        if (initialValue !== undefined && initialValue !== '') {
+            node.value = initialValue;
+        }
+    }
+};
+
+const hasIncomingConnection = (nodeId, portIndex) =>
+    Array.from(state.connections.values()).some(
+        (conn) => conn.toNodeId === nodeId && conn.toPortIndex === portIndex
+    );
+
+const getInputDefinitions = (config) => {
+    const baseInputs = (config.inputs || []).map(input =>
+        typeof input === 'string' ? { label: input } : input
+    );
+
+    const settingInputs = (config.settings || []).map(setting => ({
+        label: setting.label,
+        title: setting.title,
+        settingKey: setting.key
+    }));
+
+    return [...baseInputs, ...settingInputs];
+};
+
+// ============================================================================
+// VALUE PROPAGATION
+// ============================================================================
+
+const propagateValuesFrom = (startNodeId) => {
+    if (!startNodeId) return;
+
+    const queue = [startNodeId];
+
+    while (queue.length) {
+        const nodeId = queue.shift();
+        const fromNode = state.nodes.get(nodeId);
+        if (!fromNode || fromNode.value === undefined) continue;
+        const fromValue = String(fromNode.value);
+
+        for (const conn of state.connections.values()) {
+            if (conn.fromNodeId !== nodeId) continue;
+
+            const targetNode = state.nodes.get(conn.toNodeId);
+            if (!targetNode) continue;
+
+            let changed = false;
+
+            if (targetNode.value !== fromValue) {
+                targetNode.value = fromValue;
+                changed = true;
+            }
+
+            const targetConfig = NODE_TYPES[targetNode.type];
+            const inputDefs = getInputDefinitions(targetConfig);
+            const inputDef = inputDefs[conn.toPortIndex];
+
+            if (inputDef?.settingKey) {
+                ensureNodeSettings(targetNode);
+                if (targetNode.settings[inputDef.settingKey] !== fromValue) {
+                    targetNode.settings[inputDef.settingKey] = fromValue;
+                    changed = true;
+                }
+            }
+
+            if (changed) queue.push(targetNode.id);
+        }
+    }
 };
 
 // ============================================================================
@@ -55,6 +154,8 @@ const calculatePath = (fromPos, toPos) => {
 
 const createNodeElement = (node) => {
     const config = NODE_TYPES[node.type];
+    if (!config) return null;
+    ensureNodeSettings(node);
     const nodeEl = document.createElement('div');
     nodeEl.className = 'node';
     nodeEl.dataset.nodeId = node.id;
@@ -72,9 +173,11 @@ const createNodeElement = (node) => {
     // Inputs
     const inputsDiv = document.createElement('div');
     inputsDiv.className = 'inputs';
-    config.inputs.forEach((name, i) => {
+    const inputDefs = getInputDefinitions(config);
+    inputDefs.forEach((def, i) => {
         const container = document.createElement('div');
         container.className = 'port-container';
+        if (def.settingKey) container.classList.add('setting-port');
 
         const port = document.createElement('div');
         port.className = 'port input';
@@ -82,9 +185,35 @@ const createNodeElement = (node) => {
 
         const label = document.createElement('span');
         label.className = 'port-label';
-        label.textContent = name;
+        label.textContent = def.label;
+        if (def.title) label.title = def.title;
 
         container.append(port, label);
+
+        if (def.settingKey) {
+            const field = document.createElement('input');
+            field.type = 'text';
+            field.className = 'setting-field';
+            const connected = hasIncomingConnection(node.id, i);
+            field.disabled = connected;
+            field.placeholder = connected ? 'from input' : '';
+            field.value = node.settings?.[def.settingKey] ?? '';
+            if (def.title) field.title = def.title;
+            field.addEventListener('mousedown', (evt) => evt.stopPropagation());
+            field.addEventListener('click', (evt) => evt.stopPropagation());
+            field.addEventListener('input', (evt) => {
+                const current = state.nodes.get(node.id);
+                if (!current) return;
+                ensureNodeSettings(current);
+                current.settings[def.settingKey] = evt.target.value;
+                current.value = evt.target.value;
+                propagateValuesFrom(current.id);
+                updateCodePanel();
+                autoSave();
+            });
+            container.appendChild(field);
+        }
+
         inputsDiv.appendChild(container);
     });
 
@@ -131,6 +260,31 @@ const createConnection = (conn, fromPos, toPos) => {
 };
 
 // ============================================================================
+// SIDE PANEL
+// ============================================================================
+
+const updateCodePanel = () => {
+    const textArea = document.getElementById('code-panel-text');
+    if (!textArea) return;
+
+    const lines = Array.from(state.nodes.values())
+        .filter(node => node.type === 'code')
+        .sort((a, b) => {
+            const yDiff = (a.y ?? 0) - (b.y ?? 0);
+            if (yDiff !== 0) return yDiff;
+            const xDiff = (a.x ?? 0) - (b.x ?? 0);
+            if (xDiff !== 0) return xDiff;
+            return parseIdNumber(a.id) - parseIdNumber(b.id);
+        })
+        .map(node => {
+            const codeText = node.settings?.code ?? node.value ?? '';
+            return String(codeText).replace(/\r?\n/g, ' ');
+        });
+
+    textArea.value = lines.join('\n');
+};
+
+// ============================================================================
 // RENDERING
 // ============================================================================
 
@@ -145,6 +299,7 @@ const render = () => {
     // Render nodes
     for (const node of state.nodes.values()) {
         const nodeEl = createNodeElement(node);
+        if (!nodeEl) continue;
         nodeEl.addEventListener('mousedown', onNodeMouseDown);
         nodeEl.querySelectorAll('.port').forEach(port => {
             port.addEventListener('mousedown', onPortMouseDown);
@@ -191,6 +346,8 @@ const render = () => {
         );
         if (port) port.classList.add('connecting');
     }
+
+    updateCodePanel();
 };
 
 // ============================================================================
@@ -257,12 +414,14 @@ const onMouseMove = (e) => {
 
 const onMouseUp = (e) => {
     let shouldSave = false;
+    let shouldRender = false;
 
     // Finish dragging
     if (state.draggedNode) {
         state.draggedNode = null;
         state.dragOffset = { x: 0, y: 0 };
         shouldSave = true;
+        shouldRender = true;
     }
 
     // Finish connecting
@@ -301,6 +460,7 @@ const onMouseUp = (e) => {
                         toNodeId: to.nodeId,
                         toPortIndex: to.portIndex
                     });
+                    propagateValuesFrom(from.nodeId);
                     shouldSave = true;
                 }
             }
@@ -308,9 +468,12 @@ const onMouseUp = (e) => {
 
         state.connectingPort = null;
         state.tempConnectionEnd = null;
+        shouldRender = true;
     }
 
-    render();
+    // Only re-render when something actually changed; otherwise let click
+    // events on connections fire without being interrupted by a full rerender.
+    if (shouldRender) render();
     if (shouldSave) autoSave();
 };
 
@@ -353,8 +516,18 @@ const loadPatch = async (uuid) => {
         state.nodes.clear();
         state.connections.clear();
 
-        patch.data.nodes.forEach(node => state.nodes.set(node.id, node));
+        patch.data.nodes.forEach(node => {
+            ensureNodeSettings(node);
+            state.nodes.set(node.id, node);
+        });
         patch.data.connections.forEach(conn => state.connections.set(conn.id, conn));
+
+        const maxLoadedId = Math.max(
+            0,
+            ...patch.data.nodes.map(n => parseIdNumber(n.id)),
+            ...patch.data.connections.map(c => parseIdNumber(c.id))
+        );
+        if (maxLoadedId > idCounter) idCounter = maxLoadedId;
 
         render();
     } catch (error) {
@@ -412,7 +585,9 @@ const init = async () => {
     document.querySelectorAll('.add-node').forEach(button => {
         button.addEventListener('click', () => {
             const id = generateId('node');
-            state.nodes.set(id, { id, type: button.dataset.type, x: 100, y: 100 });
+            const nodeData = { id, type: button.dataset.type, x: 100, y: 100 };
+            ensureNodeSettings(nodeData);
+            state.nodes.set(id, nodeData);
             render();
             autoSave();
         });
@@ -436,10 +611,10 @@ const init = async () => {
         await loadPatch(hash);
     } else {
         // Add demo nodes
-        ['oscillator', 'filter', 'output'].forEach((type, i) => {
-            const id = generateId('node');
-            state.nodes.set(id, { id, type, x: 100 + i * 250, y: 150 });
-        });
+        const id = generateId('node');
+        const nodeData = { id, type: 'code', x: 150, y: 150 };
+        ensureNodeSettings(nodeData);
+        state.nodes.set(id, nodeData);
         render();
     }
 };

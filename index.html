@@ -18,15 +18,19 @@
                 </div>
             </div>
             <div id="node-palette">
-                <button class="add-node" data-type="oscillator">+ Oscillator</button>
-                <button class="add-node" data-type="filter">+ Filter</button>
-                <button class="add-node" data-type="envelope">+ Envelope</button>
-                <button class="add-node" data-type="output">+ Output</button>
+                <button class="add-node" data-type="notes">+ Notes</button>
+                <button class="add-node" data-type="code">+ Code</button>
             </div>
         </div>
-        <div id="canvas-container">
-            <svg id="connections-layer"></svg>
-            <div id="nodes-layer"></div>
+        <div id="workspace">
+            <div id="canvas-container">
+                <svg id="connections-layer"></svg>
+                <div id="nodes-layer"></div>
+            </div>
+            <div id="code-panel">
+                <div class="panel-header">Code Nodes</div>
+                <textarea id="code-panel-text" readonly placeholder="Code node contents will appear here"></textarea>
+            </div>
         </div>
     </div>
     <script src="main.js"></script>
