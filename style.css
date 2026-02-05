@@ -207,6 +207,20 @@ body {
     padding-right: 1.4rem;
 }
 
+.mode-tonic-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.75rem;
+    color: #ccc;
+    margin-bottom: 0.35rem;
+    cursor: pointer;
+}
+
+.mode-tonic-toggle input {
+    cursor: pointer;
+}
+
 .node-title {
     pointer-events: none;
 }
