@@ -1,0 +1,87 @@
+[
+  {
+    "group": "Diatonic (7)",
+    "modes": [
+      { "id": "ionian", "name": "Ionian (Major)", "degrees": [0, 2, 4, 5, 7, 9, 11] },
+      { "id": "dorian", "name": "Dorian", "degrees": [0, 2, 3, 5, 7, 9, 10] },
+      { "id": "phrygian", "name": "Phrygian", "degrees": [0, 1, 3, 5, 7, 8, 10] },
+      { "id": "lydian", "name": "Lydian", "degrees": [0, 2, 4, 6, 7, 9, 11] },
+      { "id": "mixolydian", "name": "Mixolydian", "degrees": [0, 2, 4, 5, 7, 9, 10] },
+      { "id": "aeolian", "name": "Aeolian (Natural Minor)", "degrees": [0, 2, 3, 5, 7, 8, 10] },
+      { "id": "locrian", "name": "Locrian", "degrees": [0, 1, 3, 5, 6, 8, 10] }
+    ]
+  },
+  {
+    "group": "Melodic Minor (Jazz)",
+    "modes": [
+      { "id": "melodic-minor", "name": "Melodic Minor", "degrees": [0, 2, 3, 5, 7, 9, 11] },
+      { "id": "melodic-dorian-b2", "name": "Dorian ♭2 (Phrygian ♯6)", "degrees": [0, 1, 3, 5, 7, 9, 10] },
+      { "id": "melodic-lydian-aug", "name": "Lydian Augmented", "degrees": [0, 2, 4, 6, 8, 9, 11] },
+      { "id": "melodic-lydian-dominant", "name": "Lydian Dominant (Mixolydian ♯4)", "degrees": [0, 2, 4, 6, 7, 9, 10] },
+      { "id": "melodic-mixolydian-b6", "name": "Mixolydian ♭6", "degrees": [0, 2, 4, 5, 7, 8, 10] },
+      { "id": "melodic-locrian-#2", "name": "Locrian ♯2", "degrees": [0, 2, 3, 5, 6, 8, 10] },
+      { "id": "altered", "name": "Altered (Super-Locrian)", "degrees": [0, 1, 3, 4, 6, 8, 10] }
+    ]
+  },
+  {
+    "group": "Harmonic Minor",
+    "modes": [
+      { "id": "harmonic-minor", "name": "Harmonic Minor", "degrees": [0, 2, 3, 5, 7, 8, 11] },
+      { "id": "locrian-#6", "name": "Locrian ♯6", "degrees": [0, 1, 3, 5, 6, 9, 10] },
+      { "id": "ionian-#5", "name": "Ionian ♯5", "degrees": [0, 2, 4, 5, 8, 9, 11] },
+      { "id": "dorian-#4", "name": "Dorian ♯4 (Ukrainian Dorian)", "degrees": [0, 2, 3, 6, 7, 9, 10] },
+      { "id": "phrygian-dominant", "name": "Phrygian Dominant", "degrees": [0, 1, 4, 5, 7, 8, 10] },
+      { "id": "lydian-#2", "name": "Lydian ♯2", "degrees": [0, 3, 4, 6, 7, 9, 11] },
+      { "id": "ultralocrian", "name": "Ultralocrian (Altered ♭♭7)", "degrees": [0, 1, 3, 4, 6, 7, 9] }
+    ]
+  },
+  {
+    "group": "Harmonic Major",
+    "modes": [
+      { "id": "harmonic-major", "name": "Harmonic Major", "degrees": [0, 2, 4, 5, 7, 8, 11] },
+      { "id": "dorian-b5", "name": "Dorian ♭5", "degrees": [0, 2, 3, 5, 6, 9, 10] },
+      { "id": "phrygian-b4", "name": "Phrygian ♭4", "degrees": [0, 1, 3, 4, 7, 8, 10] },
+      { "id": "lydian-b3", "name": "Lydian ♭3", "degrees": [0, 2, 3, 6, 7, 9, 11] },
+      { "id": "mixolydian-b2", "name": "Mixolydian ♭2", "degrees": [0, 1, 4, 5, 7, 9, 10] },
+      { "id": "lydian-aug-#2", "name": "Lydian Augmented ♯2", "degrees": [0, 3, 4, 6, 8, 9, 11] },
+      { "id": "locrian-dbb7", "name": "Locrian ♮6", "degrees": [0, 1, 3, 5, 6, 8, 9] }
+    ]
+  },
+  {
+    "group": "Double Harmonic / Arabic",
+    "modes": [
+      { "id": "double-harmonic-major", "name": "Double Harmonic Major", "degrees": [0, 1, 4, 5, 7, 8, 11] },
+      { "id": "gypsy-major", "name": "Gypsy Major (Hungarian Major)", "degrees": [0, 2, 3, 6, 7, 8, 11] },
+      { "id": "hungarian-minor", "name": "Hungarian Minor", "degrees": [0, 2, 3, 6, 7, 8, 11] },
+      { "id": "persian", "name": "Persian", "degrees": [0, 1, 4, 5, 6, 8, 10] },
+      { "id": "romanian-minor", "name": "Romanian Minor", "degrees": [0, 2, 3, 6, 7, 9, 10] },
+      { "id": "enigmatic", "name": "Enigmatic", "degrees": [0, 1, 4, 6, 8, 10, 11] },
+      { "id": "neapolitan-minor", "name": "Neapolitan Minor", "degrees": [0, 1, 3, 5, 7, 8, 11] }
+    ]
+  },
+  {
+    "group": "Pentatonic (5)",
+    "modes": [
+      { "id": "major-pentatonic", "name": "Major Pentatonic", "degrees": [0, 2, 4, 7, 9] },
+      { "id": "minor-pentatonic", "name": "Minor Pentatonic", "degrees": [0, 3, 5, 7, 10] },
+      { "id": "hirajoshi", "name": "Hirajōshi", "degrees": [0, 2, 3, 7, 8] },
+      { "id": "iwato", "name": "Iwato", "degrees": [0, 1, 5, 7, 10] },
+      { "id": "egyptian", "name": "Egyptian", "degrees": [0, 2, 5, 7, 10] }
+    ]
+  },
+  {
+    "group": "Hexatonic / Symmetric",
+    "modes": [
+      { "id": "whole-tone", "name": "Whole Tone", "degrees": [0, 2, 4, 6, 8, 10] },
+      { "id": "augmented", "name": "Augmented (Symmetric)", "degrees": [0, 3, 4, 7, 8, 11] },
+      { "id": "prometheus", "name": "Prometheus", "degrees": [0, 2, 4, 6, 9, 10] }
+    ]
+  },
+  {
+    "group": "Octatonic / Diminished",
+    "modes": [
+      { "id": "diminished-hw", "name": "Diminished (Half-Whole)", "degrees": [0, 1, 3, 4, 6, 7, 9, 10] },
+      { "id": "diminished-wh", "name": "Diminished (Whole-Half)", "degrees": [0, 2, 3, 5, 6, 8, 9, 11] }
+    ]
+  }
+]

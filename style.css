@@ -351,6 +351,26 @@ body {
     cursor: not-allowed;
 }
 
+.tuning-selects {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    align-items: flex-start;
+}
+
+.mode-selects {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    align-items: flex-start;
+}
+
+.tonic-select {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
 /* Connection styling */
 .connection-hitbox {
     stroke: transparent;

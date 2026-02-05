@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from storage import PatchStorage
 import os
+from pathlib import Path
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
@@ -109,6 +110,17 @@ def get_patch_children(uuid):
         "uuid": uuid,
         "children": children
     })
+
+
+@app.route('/api/tunings', methods=['GET'])
+def list_tunings():
+    """Return a flat list of all .scl files under tunings/."""
+    root = Path('tunings')
+    tunings = sorted(
+        str(p.relative_to(root)).replace(os.sep, '/')
+        for p in root.rglob('*.scl')
+    )
+    return jsonify({"tunings": tunings})
 
 
 @app.route('/api/patches', methods=['GET'])
