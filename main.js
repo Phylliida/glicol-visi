@@ -410,26 +410,48 @@ const createNodeElement = (node) => {
 
         const prevWidth = el.style.width;
         const prevHeight = el.style.height;
+        const notesUiEls = Array.from(el.querySelectorAll('.notes-ui'));
+        const prevNotesColHeights = notesUiEls.map((ui) => ui.style.getPropertyValue('--notes-col-height'));
+        const notesShellEls = Array.from(el.querySelectorAll('.notes-board-shell'));
+        const prevNotesShellHeights = notesShellEls.map((shell) => shell.style.height);
+        const minNotesColHeightPx = 10;
+
+        // Measure min node size using the notes column hard minimum, not the larger default/autosized value.
+        notesUiEls.forEach((ui) => ui.style.setProperty('--notes-col-height', `${minNotesColHeightPx}px`));
+        notesShellEls.forEach((shell) => {
+            shell.style.height = '';
+        });
         el.style.width = '';
         el.style.height = '';
         const naturalRect = el.getBoundingClientRect();
-        const minWidth = naturalRect.width / state.scale;
-        const minHeight = naturalRect.height / state.scale;
+        notesUiEls.forEach((ui, idx) => {
+            const value = prevNotesColHeights[idx];
+            if (value) ui.style.setProperty('--notes-col-height', value);
+            else ui.style.removeProperty('--notes-col-height');
+        });
+        notesShellEls.forEach((shell, idx) => {
+            shell.style.height = prevNotesShellHeights[idx];
+        });
         el.style.width = prevWidth;
         el.style.height = prevHeight;
 
         const rect = el.getBoundingClientRect();
+        const startWidth = rect.width / state.scale;
+        const startHeight = rect.height / state.scale;
+        const minWidth = Math.min(naturalRect.width / state.scale, startWidth);
+        const minHeight = Math.min(naturalRect.height / state.scale, startHeight);
         state.nodeResizing = {
             nodeId: node.id,
             startX: e.clientX,
             startY: e.clientY,
-            startWidth: rect.width / state.scale,
-            startHeight: rect.height / state.scale,
+            startWidth,
+            startHeight,
+            startLeft: node.x ?? 0,
             startTop: node.y ?? 0,
             minWidth,
             minHeight
         };
-        document.body.style.cursor = 'se-resize';
+        document.body.style.cursor = 'nw-resize';
     });
     nodeEl.appendChild(resizeHandle);
 
@@ -740,12 +762,16 @@ const onPortMouseDown = (e) => {
 
 const onMouseMove = (e) => {
     if (state.nodeResizing) {
-        const { nodeId, startX, startY, startWidth, startHeight, startTop, minWidth, minHeight } = state.nodeResizing;
+        const { nodeId, startX, startY, startWidth, startHeight, startLeft, startTop, minWidth, minHeight } =
+            state.nodeResizing;
         const dx = (e.clientX - startX) / state.scale;
         const dy = (e.clientY - startY) / state.scale;
         const node = state.nodes.get(nodeId);
         if (node) {
-            node.w = Math.max(minWidth, startWidth + dx);
+            const right = startLeft + startWidth;
+            const newWidth = Math.max(minWidth, startWidth - dx);
+            node.w = newWidth;
+            node.x = right - newWidth;
             const bottom = startTop + startHeight;
             const newHeight = Math.max(minHeight, startHeight - dy);
             node.h = newHeight;

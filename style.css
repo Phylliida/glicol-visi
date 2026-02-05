@@ -198,12 +198,12 @@ body {
     position: absolute;
     width: 14px;
     height: 14px;
-    right: 6px;
+    left: 6px;
     top: 6px;
     border-radius: 3px;
     background: linear-gradient(135deg, #4a9eff, #ff6b6b);
     opacity: 0.85;
-    cursor: ne-resize;
+    cursor: nw-resize;
     pointer-events: auto;
 }
 
@@ -528,9 +528,15 @@ g:hover .connection {
     flex: 1;
     min-width: 0;
     --notes-col-gap: 4px;
-    --notes-col-height: 190px;
+    --notes-col-height: 10px;
     --notes-col-size: 64px;
     --notes-btn-scale: 1;
+}
+.port-container.setting-port[data-setting-key="notes"] {
+    align-items: stretch;
+}
+.port-container.setting-port[data-setting-key="notes"] .notes-ui {
+    height: 100%;
 }
 .notes-controls {
     display: flex;
@@ -550,11 +556,15 @@ g:hover .connection {
 }
 .notes-board-shell {
     width: 100%;
-    overflow: auto;
+    overflow-x: auto;
+    overflow-y: visible;
     padding: 0.35rem;
     background: #1b1b1b;
     border: 1px solid #333;
     border-radius: 6px;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
 }
 .notes-board {
     display: flex;
@@ -562,6 +572,8 @@ g:hover .connection {
     align-items: stretch;
     position: relative;
     min-height: var(--notes-col-height);
+    flex: 1 1 auto;
+    min-width: 0;
 }
 .notes-col {
     position: relative;
@@ -571,8 +583,8 @@ g:hover .connection {
     background: #111;
     border: 1px solid #333;
     border-radius: 4px;
-    min-width: var(--notes-col-size);
-    flex: 1 1 var(--notes-col-size);
+    flex: 1 1 0;
+    min-width: 0;
     height: var(--notes-col-height);
 }
 .notes-col > .notes-nested-board {
