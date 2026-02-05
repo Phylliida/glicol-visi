@@ -129,6 +129,7 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
         state.buttonScale = next;
         root.style.setProperty('--notes-btn-scale', `${next}`);
         root.style.setProperty('--notes-canvas-zoom', `${zoom}`);
+        root.style.setProperty('--notes-grid-line-width', `${1 / zoom}px`);
         syncBubbleShifts(board, board, next);
     };
 
@@ -639,7 +640,6 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
             parseFloat(shellStyles.paddingBottom || '0') +
             parseFloat(shellStyles.borderTopWidth || '0') +
             parseFloat(shellStyles.borderBottomWidth || '0');
-        const bubbleAllowance = 20 * state.buttonScale;
         const notesPortRow = root.closest('.port-container.setting-port[data-setting-key="notes"]');
         let belowUiHeight = 0;
         if (notesPortRow?.parentElement) {
@@ -651,7 +651,7 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
             MIN_NOTE_COL_HEIGHT,
             (nodeRect.bottom - shellTop - notationHeight) / zoom - gap - paddingBottom - belowUiHeight
         );
-        const colHeight = Math.max(MIN_NOTE_COL_HEIGHT, available - shellVerticalChrome - bubbleAllowance);
+        const colHeight = Math.max(MIN_NOTE_COL_HEIGHT, available - shellVerticalChrome);
         applyNotesHeights(colHeight, available);
         boardShell.style.maxWidth = '100%';
         alignEndBubble(board);

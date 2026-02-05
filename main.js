@@ -708,7 +708,7 @@ const onCanvasMouseDown = (e) => {
 const onCanvasWheel = (e) => {
     const oldScale = state.scale;
     const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-    const newScale = Math.max(0.4, oldScale * zoomFactor);
+    const newScale = Math.max(0.001, oldScale * zoomFactor);
     if (newScale === oldScale) return;
 
     const canvas = document.getElementById('canvas-container');

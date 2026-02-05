@@ -532,6 +532,7 @@ g:hover .connection {
     --notes-col-size: 64px;
     --notes-btn-scale: 1;
     --notes-canvas-zoom: 1;
+    --notes-grid-line-width: 1px;
 }
 .port-container.setting-port[data-setting-key="notes"] {
     align-items: stretch;
@@ -571,14 +572,9 @@ g:hover .connection {
 .notes-board-shell::after {
     content: '';
     position: absolute;
-    top: -0.5px;
-    left: -0.5px;
-    width: calc(100% * var(--notes-canvas-zoom) + 1px);
-    height: calc(100% * var(--notes-canvas-zoom) + 1px);
-    transform: scale(calc(1 / var(--notes-canvas-zoom)));
-    transform-origin: top left;
+    inset: 0;
     box-sizing: border-box;
-    border: 1px solid #333;
+    border: var(--notes-grid-line-width) solid #333;
     border-radius: 6px;
     pointer-events: none;
 }
@@ -612,6 +608,7 @@ g:hover .connection {
     top: 0;
     left: 50%;
     transform: translateX(-50%);
+    z-index: 6;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -631,12 +628,7 @@ g:hover .connection {
 .notes-cell::before {
     content: '';
     position: absolute;
-    top: -0.5px;
-    left: -0.5px;
-    width: calc(100% * var(--notes-canvas-zoom) + 1px);
-    height: calc(100% * var(--notes-canvas-zoom) + 1px);
-    transform: scale(calc(1 / var(--notes-canvas-zoom)));
-    transform-origin: top left;
+    inset: 0;
     box-sizing: border-box;
     background: #0f0f0f;
     pointer-events: none;
@@ -645,23 +637,18 @@ g:hover .connection {
 .notes-cell::after {
     content: '';
     position: absolute;
-    top: -0.5px;
-    left: -0.5px;
-    width: calc(100% * var(--notes-canvas-zoom) + 1px);
-    height: calc(100% * var(--notes-canvas-zoom) + 1px);
-    transform: scale(calc(1 / var(--notes-canvas-zoom)));
-    transform-origin: top left;
+    inset: 0;
     box-sizing: border-box;
-    border-right: 1px solid #2f2f2f;
-    border-bottom: 1px solid #2f2f2f;
+    border-right: var(--notes-grid-line-width) solid #2f2f2f;
+    border-bottom: var(--notes-grid-line-width) solid #2f2f2f;
     pointer-events: none;
     z-index: 1;
 }
 .notes-col .notes-cell:first-of-type::after {
-    border-top: 1px solid #2f2f2f;
+    border-top: var(--notes-grid-line-width) solid #2f2f2f;
 }
 .notes-board > .notes-col:first-of-type .notes-cell::after {
-    border-left: 1px solid #2f2f2f;
+    border-left: var(--notes-grid-line-width) solid #2f2f2f;
 }
 .notes-cell:hover::before {
     background: #1e1e1e;
