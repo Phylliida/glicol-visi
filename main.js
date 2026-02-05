@@ -41,7 +41,8 @@ const state = {
     panning: null,
     connectingPort: null,
     tempConnectionEnd: null,
-    resizing: null
+    resizing: null,
+    nodeResizing: null
 };
 
 const screenToWorld = (clientX, clientY) => {
@@ -242,6 +243,8 @@ const createNodeElement = (node) => {
     nodeEl.dataset.nodeId = node.id;
     nodeEl.style.left = `${node.x}px`;
     nodeEl.style.top = `${node.y}px`;
+    if (node.w) nodeEl.style.width = `${node.w}px`;
+    if (node.h) nodeEl.style.height = `${node.h}px`;
 
     const header = document.createElement('div');
     header.className = 'node-header';
@@ -395,6 +398,40 @@ const createNodeElement = (node) => {
 
     portsContainer.append(inputsDiv, outputsDiv);
     nodeEl.appendChild(portsContainer);
+
+    const resizeHandle = document.createElement('div');
+    resizeHandle.className = 'node-resize';
+    resizeHandle.title = 'Resize node';
+    resizeHandle.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        const el = e.currentTarget.closest('.node');
+        if (!el) return;
+
+        const prevWidth = el.style.width;
+        const prevHeight = el.style.height;
+        el.style.width = '';
+        el.style.height = '';
+        const naturalRect = el.getBoundingClientRect();
+        const minWidth = naturalRect.width / state.scale;
+        const minHeight = naturalRect.height / state.scale;
+        el.style.width = prevWidth;
+        el.style.height = prevHeight;
+
+        const rect = el.getBoundingClientRect();
+        state.nodeResizing = {
+            nodeId: node.id,
+            startX: e.clientX,
+            startY: e.clientY,
+            startWidth: rect.width / state.scale,
+            startHeight: rect.height / state.scale,
+            startTop: node.y ?? 0,
+            minWidth,
+            minHeight
+        };
+        document.body.style.cursor = 'se-resize';
+    });
+    nodeEl.appendChild(resizeHandle);
 
     return nodeEl;
 };
@@ -667,6 +704,7 @@ const onCanvasWheel = (e) => {
 
 const onNodeMouseDown = (e) => {
     if (e.target.classList.contains('port')) return;
+    if (e.target.closest('.node-resize')) return;
 
     const nodeEl = e.target.closest('.node');
     if (!nodeEl) return;
@@ -697,6 +735,23 @@ const onPortMouseDown = (e) => {
 };
 
 const onMouseMove = (e) => {
+    if (state.nodeResizing) {
+        const { nodeId, startX, startY, startWidth, startHeight, startTop, minWidth, minHeight } = state.nodeResizing;
+        const dx = (e.clientX - startX) / state.scale;
+        const dy = (e.clientY - startY) / state.scale;
+        const node = state.nodes.get(nodeId);
+        if (node) {
+            node.w = Math.max(minWidth, startWidth + dx);
+            const bottom = startTop + startHeight;
+            const newHeight = Math.max(minHeight, startHeight - dy);
+            node.h = newHeight;
+            node.y = bottom - newHeight;
+            render();
+        }
+        e.preventDefault();
+        return;
+    }
+
     if (state.resizing) {
         const { startX, startWidth, panel } = state.resizing;
         const delta = e.clientX - startX;
@@ -739,6 +794,13 @@ const onMouseMove = (e) => {
 };
 
 const onMouseUp = (e) => {
+    if (state.nodeResizing) {
+        state.nodeResizing = null;
+        document.body.style.cursor = '';
+        autoSave();
+        return;
+    }
+
     if (state.resizing) {
         state.resizing = null;
         document.body.style.cursor = '';

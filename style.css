@@ -194,6 +194,23 @@ body {
     border-color: #4a9eff;
 }
 
+.node-resize {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    right: 6px;
+    top: 6px;
+    border-radius: 3px;
+    background: linear-gradient(135deg, #4a9eff, #ff6b6b);
+    opacity: 0.85;
+    cursor: ne-resize;
+    pointer-events: auto;
+}
+
+.node-resize:hover {
+    opacity: 1;
+}
+
 .node-header {
     font-weight: bold;
     margin-bottom: 0.5rem;
