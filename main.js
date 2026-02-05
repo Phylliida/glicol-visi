@@ -37,10 +37,23 @@ const state = {
     draggedNode: null,
     dragOffset: { x: 0, y: 0 },
     canvasOffset: { x: 0, y: 0 },
+    scale: 1,
     panning: null,
     connectingPort: null,
     tempConnectionEnd: null,
     resizing: null
+};
+
+const screenToWorld = (clientX, clientY) => {
+    const canvas = document.getElementById('canvas-container');
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    const screenX = clientX - rect.left;
+    const screenY = clientY - rect.top;
+    return {
+        x: (screenX - state.canvasOffset.x) / state.scale,
+        y: (screenY - state.canvasOffset.y) / state.scale
+    };
 };
 
 const ensureNodeSettings = (node) => {
@@ -206,8 +219,8 @@ const getPortPosition = (nodeId, portType, portIndex) => {
     const containerRect = document.getElementById('canvas-container').getBoundingClientRect();
 
     return {
-        x: rect.left + rect.width / 2 - containerRect.left,
-        y: rect.top + rect.height / 2 - containerRect.top
+        x: (rect.left + rect.width / 2 - containerRect.left - state.canvasOffset.x) / state.scale,
+        y: (rect.top + rect.height / 2 - containerRect.top - state.canvasOffset.y) / state.scale
     };
 };
 
@@ -227,8 +240,8 @@ const createNodeElement = (node) => {
     const nodeEl = document.createElement('div');
     nodeEl.className = 'node';
     nodeEl.dataset.nodeId = node.id;
-    nodeEl.style.left = `${node.x + state.canvasOffset.x}px`;
-    nodeEl.style.top = `${node.y + state.canvasOffset.y}px`;
+    nodeEl.style.left = `${node.x}px`;
+    nodeEl.style.top = `${node.y}px`;
 
     const header = document.createElement('div');
     header.className = 'node-header';
@@ -535,6 +548,18 @@ function render() {
 
     if (canvas) {
         canvas.style.backgroundPosition = `${state.canvasOffset.x}px ${state.canvasOffset.y}px`;
+        const gridSize = 20 * state.scale;
+        canvas.style.backgroundSize = `${gridSize}px ${gridSize}px`;
+    }
+
+    const transform = `translate(${state.canvasOffset.x}px, ${state.canvasOffset.y}px) scale(${state.scale})`;
+    if (nodesLayer) {
+        nodesLayer.style.transform = transform;
+        nodesLayer.style.transformOrigin = '0 0';
+    }
+    if (connectionsLayer) {
+        connectionsLayer.style.transform = transform;
+        connectionsLayer.style.transformOrigin = '0 0';
     }
 
     // Clear
@@ -617,17 +642,41 @@ const onCanvasMouseDown = (e) => {
     e.preventDefault();
 };
 
+const onCanvasWheel = (e) => {
+    const oldScale = state.scale;
+    const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+    const newScale = Math.min(3, Math.max(0.4, oldScale * zoomFactor));
+    if (newScale === oldScale) return;
+
+    const canvas = document.getElementById('canvas-container');
+    if (canvas) {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+        // Keep the point under the cursor stationary while zooming.
+        const factor = newScale / oldScale;
+        state.canvasOffset.x = state.canvasOffset.x * factor + mouseX * (1 - factor);
+        state.canvasOffset.y = state.canvasOffset.y * factor + mouseY * (1 - factor);
+    }
+
+    state.scale = newScale;
+    render();
+    e.preventDefault();
+};
+
 const onNodeMouseDown = (e) => {
     if (e.target.classList.contains('port')) return;
 
     const nodeEl = e.target.closest('.node');
     if (!nodeEl) return;
 
-    const rect = nodeEl.getBoundingClientRect();
     state.draggedNode = nodeEl.dataset.nodeId;
+    const current = state.nodes.get(state.draggedNode);
+    const mouseWorld = screenToWorld(e.clientX, e.clientY);
     state.dragOffset = {
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top
+        x: mouseWorld.x - (current?.x ?? 0),
+        y: mouseWorld.y - (current?.y ?? 0)
     };
 
     render();
@@ -666,11 +715,7 @@ const onMouseMove = (e) => {
         return;
     }
 
-    const containerRect = document.getElementById('canvas-container').getBoundingClientRect();
-    const mousePos = {
-        x: e.clientX - containerRect.left,
-        y: e.clientY - containerRect.top
-    };
+    const mousePos = screenToWorld(e.clientX, e.clientY);
 
     let changed = false;
 
@@ -678,8 +723,8 @@ const onMouseMove = (e) => {
     if (state.draggedNode) {
         const node = state.nodes.get(state.draggedNode);
         if (node) {
-            node.x = mousePos.x - state.canvasOffset.x - state.dragOffset.x;
-            node.y = mousePos.y - state.canvasOffset.y - state.dragOffset.y;
+            node.x = mousePos.x - state.dragOffset.x;
+            node.y = mousePos.y - state.dragOffset.y;
             changed = true;
         }
     }
@@ -876,6 +921,7 @@ const init = async () => {
     const canvas = document.getElementById('canvas-container');
     if (canvas) {
         canvas.addEventListener('mousedown', onCanvasMouseDown);
+        canvas.addEventListener('wheel', onCanvasWheel, { passive: false });
     }
 
     // Resize code panel

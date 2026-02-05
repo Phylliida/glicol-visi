@@ -27,6 +27,23 @@ const getNode = (context, nodeId) => context?.state?.nodes?.get(nodeId);
 const hasIncoming = (context, nodeId, portIndex) =>
     context?.hasIncomingConnection ? context.hasIncomingConnection(nodeId, portIndex) : false;
 
+const alignOutputsToInputs = (nodeEl) => {
+    if (!nodeEl) return;
+    const inputs = Array.from(nodeEl.querySelectorAll('.inputs .port-container'));
+    const outputs = Array.from(nodeEl.querySelectorAll('.outputs .port-container'));
+    if (!inputs.length || inputs.length !== outputs.length) return;
+
+    outputs.forEach((outRow, idx) => {
+        outRow.style.minHeight = '';
+        const inRow = inputs[idx];
+        const height = inRow?.getBoundingClientRect().height;
+        if (height) {
+            outRow.style.minHeight = `${height}px`;
+            outRow.style.alignItems = 'center';
+        }
+    });
+};
+
 const shouldForceHideModeTonic = (nodeId, context = {}) => {
     const node = getNode(context, nodeId);
     if (!node) return false;
@@ -62,6 +79,8 @@ const applyModeTonicVisibility = (nodeId, context = {}, opts = {}) => {
         toggle.checked = !hidden;
         toggle.disabled = forceHide;
     }
+
+    alignOutputsToInputs(nodeEl);
 };
 
 const refreshModeAndTonicForNode = (nodeId, context = {}) => {
