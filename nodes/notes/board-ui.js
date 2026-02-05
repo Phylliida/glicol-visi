@@ -3,7 +3,6 @@ import {
     DEFAULT_NOTE_ROWS,
     DEFAULT_NOTE_COL_HEIGHT,
     DEFAULT_NOTE_CONTAINER_WIDTH,
-    DEFAULT_NOTE_BUTTON_SCALE,
     BUBBLE_SHIFT_UNIT,
     clampNumber
 } from './constants.js';
@@ -52,6 +51,7 @@ const alignEndBubble = (boardEl) => {
 
 const isDigit = (ch) => ch >= '0' && ch <= '9';
 const MIN_NOTE_COL_HEIGHT = 10;
+const BUTTON_SIZE_MULTIPLIER = 1.35;
 
 const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
     const settings = node.settings ?? {};
@@ -63,7 +63,7 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
         rows: clampNumber(settings.noteRows, 1, 32, DEFAULT_NOTE_ROWS),
         colHeight: clampNumber(settings.noteColHeight, MIN_NOTE_COL_HEIGHT, 600, DEFAULT_NOTE_COL_HEIGHT),
         containerWidth: clampNumber(settings.noteContainerWidth, 120, 1200, DEFAULT_NOTE_CONTAINER_WIDTH),
-        buttonScale: clampNumber(settings.noteButtonScale, 0.2, 2, DEFAULT_NOTE_BUTTON_SCALE),
+        buttonScale: Math.max(0.1, Number(context?.state?.scale) || 1),
         editMode: settings.noteEditMode !== false,
         notation: settings.notes ?? DEFAULT_NOTATION
     };
@@ -74,7 +74,6 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
         current.settings.noteRows = state.rows;
         current.settings.noteColHeight = state.colHeight;
         current.settings.noteContainerWidth = state.containerWidth;
-        current.settings.noteButtonScale = state.buttonScale;
         current.settings.noteEditMode = state.editMode;
         if (context.autoSave) context.autoSave();
     };
@@ -105,24 +104,6 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
     });
     controls.append(makeLabel('Rows', rowsInput));
 
-    const scaleInput = document.createElement('input');
-    scaleInput.type = 'range';
-    scaleInput.min = '0.2';
-    scaleInput.max = '2';
-    scaleInput.step = '0.1';
-    scaleInput.value = String(state.buttonScale);
-    scaleInput.addEventListener('mousedown', (e) => e.stopPropagation());
-    scaleInput.addEventListener('click', (e) => e.stopPropagation());
-    scaleInput.addEventListener('input', () => {
-        const next = clampNumber(scaleInput.value, 0.2, 2, state.buttonScale);
-        state.buttonScale = next;
-        root.style.setProperty('--notes-btn-scale', next);
-        syncBubbleShifts(board, board, next);
-        alignEndBubble(board);
-        persistUiState();
-    });
-    controls.append(makeLabel('Scale', scaleInput));
-
     const editToggle = document.createElement('button');
     editToggle.type = 'button';
     editToggle.className = 'notes-edit-toggle';
@@ -141,6 +122,14 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
     const board = document.createElement('div');
     board.className = 'notes-board';
     boardShell.appendChild(board);
+
+    const applyZoomButtonScale = () => {
+        const zoom = Math.max(0.001, Number(context?.state?.scale) || 1);
+        const next = BUTTON_SIZE_MULTIPLIER / zoom;
+        state.buttonScale = next;
+        root.style.setProperty('--notes-btn-scale', `${next}`);
+        syncBubbleShifts(board, board, next);
+    };
 
     const applyNotesHeights = (colHeight, shellHeight = null) => {
         state.colHeight = colHeight;
@@ -617,7 +606,7 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
     };
 
     applyNotesHeights(state.colHeight);
-    root.style.setProperty('--notes-btn-scale', state.buttonScale);
+    applyZoomButtonScale();
 
     createBoardBubble(board, 'start');
     createBoardBubble(board, 'end');
@@ -636,6 +625,7 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
     const updateAutoSize = () => {
         const nodeEl = root.closest('.node');
         if (!nodeEl) return;
+        applyZoomButtonScale();
         const nodeRect = nodeEl.getBoundingClientRect();
         const shellTop = boardShell.getBoundingClientRect().top;
         const notationHeight = notationRow.getBoundingClientRect().height;
@@ -683,7 +673,7 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
 
     const setDisabled = (isDisabled) => {
         root.classList.toggle('notes-disabled', isDisabled);
-        [rowsInput, scaleInput, editToggle, notationInput].forEach((el) => {
+        [rowsInput, editToggle, notationInput].forEach((el) => {
             el.disabled = isDisabled;
         });
         boardShell.style.pointerEvents = isDisabled ? 'none' : '';
