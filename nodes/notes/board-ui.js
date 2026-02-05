@@ -128,6 +128,7 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
         const next = BUTTON_SIZE_MULTIPLIER / zoom;
         state.buttonScale = next;
         root.style.setProperty('--notes-btn-scale', `${next}`);
+        root.style.setProperty('--notes-canvas-zoom', `${zoom}`);
         syncBubbleShifts(board, board, next);
     };
 
