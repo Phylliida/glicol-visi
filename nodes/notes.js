@@ -10,167 +10,18 @@ const {
     modesForCount,
     modesByGroupForCount,
     tonicOptionsForCount,
-    clampTonicToCount
+    clampTonicToCount,
+    DEFAULT_TUNING,
+    DEFAULT_MODE,
+    DEFAULT_TONIC,
+    TONIC_OPTIONS,
+    getTuningList,
+    getModeSets,
+    resolveTuningValue,
+    resolveModeValue,
+    resolveTonicValue,
+    splitTuningPath
 } = TuningUtils;
-
-const DEFAULT_TUNING = 'equal_temperament/et_<=12/fj-12tet.scl';
-const DEFAULT_MODE = 'ionian';
-const DEFAULT_TONIC = 0; // 0 = "A" in our display list
-const TONIC_OPTIONS = [
-    { value: 0, label: 'A' },
-    { value: 1, label: 'A#/Bb' },
-    { value: 2, label: 'B' },
-    { value: 3, label: 'C' },
-    { value: 4, label: 'C#/Db' },
-    { value: 5, label: 'D' },
-    { value: 6, label: 'D#/Eb' },
-    { value: 7, label: 'E' },
-    { value: 8, label: 'F' },
-    { value: 9, label: 'F#/Gb' },
-    { value: 10, label: 'G' },
-    { value: 11, label: 'G#/Ab' }
-];
-
-let tuningListCache = null;
-let tuningListPromise = null;
-let tuningHierarchy = null;
-let modeSetsCache = null;
-let modeListPromise = null;
-
-const buildTuningHierarchy = (list) => {
-    const categories = new Set();
-    const subs = new Map(); // cat -> [subs]
-    const files = new Map(); // `${cat}/${sub}` -> [paths]
-
-    list.forEach((p) => {
-        const parts = p.split('/');
-        const cat = parts[0] || '';
-        const sub = parts.length > 2 ? parts[1] : '';
-        categories.add(cat);
-        const subSet = subs.get(cat) ?? new Set();
-        subSet.add(sub);
-        subs.set(cat, subSet);
-        const key = `${cat}/${sub}`;
-        const arr = files.get(key) ?? [];
-        arr.push(p);
-        files.set(key, arr);
-    });
-
-    return {
-        categories: Array.from(categories).sort(),
-        subs: new Map(
-            Array.from(subs.entries()).map(([cat, set]) => [cat, Array.from(set).sort()])
-        ),
-        files
-    };
-};
-
-const splitTuningPath = (p) => {
-    const parts = p.split('/');
-    const category = parts[0] || '';
-    const subcategory = parts.length > 2 ? parts[1] : '';
-    const file =
-        parts.length > 2 ? parts.slice(2).join('/') : parts.length === 2 ? parts[1] : parts[0];
-    return { category, subcategory, file };
-};
-
-const getModeSets = (context = {}) => {
-    if (modeSetsCache) return Promise.resolve(modeSetsCache);
-    if (modeListPromise) return modeListPromise;
-    modeListPromise = fetch('/modes.json')
-        .then((res) => res.json())
-        .then((data) => {
-            modeSetsCache = Array.isArray(data) ? data : [];
-            if (context.render) context.render();
-            return modeSetsCache;
-        })
-        .catch((err) => {
-            console.error('Failed to load modes', err);
-            modeSetsCache = [];
-            return modeSetsCache;
-        });
-    return modeListPromise;
-};
-
-const resolveTuningValue = (raw, context = {}) => {
-    const val = (raw ?? '').trim();
-    const list = tuningListCache;
-
-    if (!list) {
-        getTuningList(context).then(() => context.render && context.render());
-        return val || DEFAULT_TUNING;
-    }
-
-    if (!val) return DEFAULT_TUNING;
-
-    const lower = val.toLowerCase();
-
-    const exact = list.find((t) => t === val);
-    if (exact) return exact;
-
-    const ci = list.find((t) => t.toLowerCase() === lower);
-    if (ci) return ci;
-
-    const base = lower.replace(/^.*[\\/]/, '');
-    const baseMatch = list.find(
-        (t) => t.toLowerCase().endsWith(`/${base}`) || t.toLowerCase() === base
-    );
-    if (baseMatch) return baseMatch;
-
-    return DEFAULT_TUNING;
-};
-
-const flattenModes = () =>
-    (modeSetsCache ?? []).flatMap((set) => set.modes.map((m) => ({ ...m, group: set.group })));
-
-const modesByGroup = () => {
-    const all = flattenModes();
-    const map = new Map();
-    all.forEach((m) => {
-        const arr = map.get(m.group) ?? [];
-        arr.push(m);
-        map.set(m.group, arr);
-    });
-    return map;
-};
-
-const resolveModeValue = (raw, context = {}) => {
-    const val = (raw ?? '').trim();
-    const all = flattenModes();
-    if (!all.length) {
-        getModeSets(context).then(() => context.render && context.render());
-    }
-    if (val === '') return '';
-    const exact = all.find((m) => m.id === val);
-    if (exact) return exact.id;
-    const ci = all.find((m) => m.id.toLowerCase() === val.toLowerCase());
-    return ci ? ci.id : DEFAULT_MODE;
-};
-
-const resolveTonicValue = (raw) => {
-    const n = parseInt(raw, 10);
-    if (!Number.isFinite(n)) return DEFAULT_TONIC;
-    return Math.max(0, n);
-};
-
-const getTuningList = (context = {}) => {
-    if (tuningListCache) return Promise.resolve(tuningListCache);
-    if (tuningListPromise) return tuningListPromise;
-    tuningListPromise = fetch('/api/tunings')
-        .then((res) => res.json())
-        .then((data) => {
-            tuningListCache = Array.isArray(data.tunings) ? data.tunings : [];
-            tuningHierarchy = buildTuningHierarchy(tuningListCache);
-            if (context.render) context.render();
-            return tuningListCache;
-        })
-        .catch((err) => {
-            console.error('Failed to load tunings', err);
-            tuningListCache = [];
-            return tuningListCache;
-        });
-    return tuningListPromise;
-};
 
 const getNode = (context, nodeId) => context?.state?.nodes?.get(nodeId);
 const hasIncoming = (context, nodeId, portIndex) =>
@@ -250,7 +101,7 @@ const refreshModeAndTonicForNode = (nodeId, context = {}) => {
 
 const updateTuningFields = (nodeId, portIndex, rawValue, context = {}) => {
     const nodeEl = document.querySelector(`[data-node-id="${nodeId}"]`);
-    if (!nodeEl || !tuningListCache || !tuningHierarchy) return;
+    if (!nodeEl || !TuningUtils.tuningListCache || !TuningUtils.tuningHierarchy) return;
 
     const selects = Array.from(
         nodeEl.querySelectorAll(`select.setting-field[data-port-index="${portIndex}"]`)
@@ -276,12 +127,12 @@ const updateTuningFields = (nodeId, portIndex, rawValue, context = {}) => {
     };
 
     if (selectCat) {
-        setOptions(selectCat, tuningHierarchy.categories);
+        setOptions(selectCat, TuningUtils.tuningHierarchy.categories);
         selectCat.value = category || selectCat.options[0]?.value || '';
     }
 
     if (selectSub) {
-        const subs = tuningHierarchy.subs.get(selectCat?.value ?? '') ?? [''];
+        const subs = TuningUtils.tuningHierarchy.subs.get(selectCat?.value ?? '') ?? [''];
         setOptions(
             selectSub,
             subs.map((s) => ({ value: s, label: s || 'root' }))
@@ -291,7 +142,7 @@ const updateTuningFields = (nodeId, portIndex, rawValue, context = {}) => {
 
     if (selectTun) {
         const key = `${selectCat?.value ?? ''}/${selectSub?.value ?? ''}`;
-        const tunes = tuningHierarchy.files.get(key) ?? [];
+        const tunes = TuningUtils.tuningHierarchy.files.get(key) ?? [];
         setOptions(
             selectTun,
             tunes.map((t) => ({ value: t, label: splitTuningPath(t).file }))
@@ -322,7 +173,7 @@ const updateModeFields = (nodeId, portIndex, rawValue, context = {}) => {
     );
     if (!selects.length) return;
 
-    if (!modeSetsCache) {
+    if (!TuningUtils.modeSetsCache) {
         getModeSets(context).then(() => updateModeFields(nodeId, portIndex, rawValue, context));
         return;
     }
@@ -338,8 +189,8 @@ const updateModeFields = (nodeId, portIndex, rawValue, context = {}) => {
 
     const connected = hasIncoming(context, nodeId, portIndex);
     const value = resolveModeValue(rawValue, context);
-    const availableModes = modesForCount(meta.count, modeSetsCache);
-    const groupedModes = modesByGroupForCount(meta.count, modeSetsCache);
+    const availableModes = modesForCount(meta.count, TuningUtils.modeSetsCache);
+    const groupedModes = modesByGroupForCount(meta.count, TuningUtils.modeSetsCache);
     const mode =
         value === ''
             ? null
@@ -469,7 +320,7 @@ const updateTonicField = (nodeId, portIndex, rawValue, context = {}) => {
     applyModeTonicVisibility(nodeId, context);
 };
 
-const renderHeaderExtras = (node, context = {}) => {
+const buildModeTonicToggle = (node, context = {}) => {
     const toggleWrap = document.createElement('label');
     toggleWrap.className = 'mode-tonic-toggle';
     const toggle = document.createElement('input');
@@ -502,7 +353,50 @@ const renderHeaderExtras = (node, context = {}) => {
     return toggleWrap;
 };
 
+const renderHeaderExtras = (node, context = {}) => {
+    const resetBtn = document.createElement('button');
+    resetBtn.type = 'button';
+    resetBtn.className = 'reset-btn';
+    resetBtn.title = 'Reset to standard tuning';
+    resetBtn.setAttribute('aria-label', 'Reset to standard tuning');
+    resetBtn.innerHTML =
+        '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"><path fill="currentColor" d="M12 20q-3.35 0-5.675-2.325T4 12t2.325-5.675T12 4q1.725 0 3.3.712T18 6.75V4h2v7h-7V9h4.2q-.8-1.4-2.187-2.2T12 6Q9.5 6 7.75 7.75T6 12t1.75 4.25T12 18q1.925 0 3.475-1.1T17.65 14h2.1q-.7 2.65-2.85 4.325T12 20"/></svg>';
+    resetBtn.addEventListener('mousedown', (evt) => evt.stopPropagation());
+    resetBtn.addEventListener('click', (evt) => {
+        evt.stopPropagation();
+        const current = getNode(context, node.id);
+        if (!current) return;
+        const defs = getInputDefinitions(NOTES_CONFIG);
+        const tuningPortIndex = defs.findIndex((d) => d.settingKey === 'tuning');
+        const modePortIndex = defs.findIndex((d) => d.settingKey === 'mode');
+        const tonicPortIndex = defs.findIndex((d) => d.settingKey === 'tonic');
+
+        current.settings.tuning = DEFAULT_TUNING;
+        current.settings.mode = '';
+        current.settings.tonic = '';
+        current.settings.hideModeTonic = true;
+        current.value = DEFAULT_TUNING;
+
+        if (tuningPortIndex !== -1) updateTuningFields(current.id, tuningPortIndex, DEFAULT_TUNING, context);
+        if (modePortIndex !== -1) updateModeFields(current.id, modePortIndex, '', context);
+        if (tonicPortIndex !== -1) updateTonicField(current.id, tonicPortIndex, '', context);
+
+        applyModeTonicVisibility(current.id, context, { hidden: true });
+        refreshModeAndTonicForNode(current.id, context);
+        if (context.propagateValuesFrom) context.propagateValuesFrom(current.id);
+        if (context.updateCodePanel) context.updateCodePanel();
+        if (context.render) context.render();
+        if (context.autoSave) context.autoSave();
+    });
+
+    const wrap = document.createElement('div');
+    wrap.className = 'reset-wrap';
+    wrap.append(resetBtn);
+    return wrap;
+};
+
 const buildTuningField = ({ node, setting, portIndex, connected, context }) => {
+    const settingKey = setting.settingKey ?? setting.key;
     const selectCat = document.createElement('select');
     const selectSub = document.createElement('select');
     const selectTun = document.createElement('select');
@@ -510,7 +404,7 @@ const buildTuningField = ({ node, setting, portIndex, connected, context }) => {
     [selectCat, selectSub, selectTun].forEach((sel, idx) => {
         sel.className = 'setting-field';
         sel.dataset.portIndex = portIndex;
-        sel.dataset.settingKey = setting.key;
+        sel.dataset.settingKey = settingKey;
         sel.dataset.tuningField = ['category', 'subcategory', 'tuning'][idx];
         sel.disabled = connected;
         if (setting.title) sel.title = setting.title;
@@ -522,7 +416,7 @@ const buildTuningField = ({ node, setting, portIndex, connected, context }) => {
         const current = getNode(context, node.id);
         if (!current) return;
         const val = selectTun.value || '';
-        current.settings[setting.key] = val;
+        current.settings[settingKey] = val;
         current.value = val;
         getTuningMeta(val);
         if (context.propagateValuesFrom) context.propagateValuesFrom(current.id);
@@ -533,7 +427,7 @@ const buildTuningField = ({ node, setting, portIndex, connected, context }) => {
 
     selectCat.addEventListener('change', () => {
         const cat = selectCat.value;
-        const subs = (tuningHierarchy?.subs.get(cat) ?? ['']).map((s) => s);
+        const subs = (TuningUtils.tuningHierarchy?.subs.get(cat) ?? ['']).map((s) => s);
         selectSub.innerHTML = '';
         subs.forEach((s) => {
             const op = document.createElement('option');
@@ -544,7 +438,7 @@ const buildTuningField = ({ node, setting, portIndex, connected, context }) => {
         selectSub.value = subs[0] ?? '';
 
         const key = `${cat}/${selectSub.value ?? ''}`;
-        const tunes = tuningHierarchy?.files.get(key) ?? [];
+        const tunes = TuningUtils.tuningHierarchy?.files.get(key) ?? [];
         selectTun.innerHTML = '';
         tunes.forEach((t) => {
             const op = document.createElement('option');
@@ -560,7 +454,7 @@ const buildTuningField = ({ node, setting, portIndex, connected, context }) => {
         const cat = selectCat.value;
         const sub = selectSub.value;
         const key = `${cat}/${sub ?? ''}`;
-        const tunes = tuningHierarchy?.files.get(key) ?? [];
+        const tunes = TuningUtils.tuningHierarchy?.files.get(key) ?? [];
         selectTun.innerHTML = '';
         tunes.forEach((t) => {
             const op = document.createElement('option');
@@ -575,11 +469,11 @@ const buildTuningField = ({ node, setting, portIndex, connected, context }) => {
     selectTun.addEventListener('change', commit);
 
     const initDropdowns = () => {
-        const currentVal = resolveTuningValue(node.settings?.[setting.key] ?? '', context);
+        const currentVal = resolveTuningValue(node.settings?.[settingKey] ?? '', context);
         const { category, subcategory } = splitTuningPath(currentVal);
 
         selectCat.innerHTML = '';
-        (tuningHierarchy?.categories ?? []).forEach((c) => {
+        (TuningUtils.tuningHierarchy?.categories ?? []).forEach((c) => {
             const op = document.createElement('option');
             op.value = c;
             op.textContent = c;
@@ -590,7 +484,7 @@ const buildTuningField = ({ node, setting, portIndex, connected, context }) => {
             selectCat.value = selectCat.options[0].value;
         }
 
-        const subs = tuningHierarchy?.subs.get(selectCat.value) ?? [''];
+        const subs = TuningUtils.tuningHierarchy?.subs.get(selectCat.value) ?? [''];
         selectSub.innerHTML = '';
         subs.forEach((s) => {
             const op = document.createElement('option');
@@ -604,7 +498,7 @@ const buildTuningField = ({ node, setting, portIndex, connected, context }) => {
         }
 
         const key = `${selectCat.value}/${selectSub.value ?? ''}`;
-        const tunes = tuningHierarchy?.files.get(key) ?? [];
+        const tunes = TuningUtils.tuningHierarchy?.files.get(key) ?? [];
         selectTun.innerHTML = '';
         tunes.forEach((t) => {
             const op = document.createElement('option');
@@ -625,7 +519,7 @@ const buildTuningField = ({ node, setting, portIndex, connected, context }) => {
         }
     };
 
-    if (tuningListCache && tuningHierarchy) {
+    if (TuningUtils.tuningListCache && TuningUtils.tuningHierarchy) {
         initDropdowns();
     } else {
         selectCat.innerHTML = '';
@@ -651,13 +545,14 @@ const buildTuningField = ({ node, setting, portIndex, connected, context }) => {
 };
 
 const buildModeField = ({ node, setting, portIndex, connected, context }) => {
+    const settingKey = setting.settingKey ?? setting.key;
     const selectGroup = document.createElement('select');
     const selectMode = document.createElement('select');
 
     [selectGroup, selectMode].forEach((sel, idx) => {
         sel.className = 'setting-field';
         sel.dataset.portIndex = portIndex;
-        sel.dataset.settingKey = setting.key;
+        sel.dataset.settingKey = settingKey;
         sel.dataset.modeField = ['group', 'mode'][idx];
         sel.disabled = connected;
         if (setting.title) sel.title = setting.title;
@@ -672,7 +567,7 @@ const buildModeField = ({ node, setting, portIndex, connected, context }) => {
         const current = getNode(context, node.id);
         if (!current) return;
         const val = selectMode.value;
-        current.settings[setting.key] = val;
+        current.settings[settingKey] = val;
         if (context.updateCodePanel) context.updateCodePanel();
         if (context.propagateValuesFrom) context.propagateValuesFrom(current.id);
         if (context.autoSave) context.autoSave();
@@ -682,7 +577,7 @@ const buildModeField = ({ node, setting, portIndex, connected, context }) => {
         const current = getNode(context, node.id);
         if (!current) return;
         const tuningPath = resolveTuningValue(current.settings?.tuning ?? DEFAULT_TUNING, context);
-        if (!modeSetsCache) {
+        if (!TuningUtils.modeSetsCache) {
             selectGroup.innerHTML = '';
             const loadingG = document.createElement('option');
             loadingG.textContent = 'Loading...';
@@ -713,8 +608,8 @@ const buildModeField = ({ node, setting, portIndex, connected, context }) => {
             return;
         }
 
-        availableModes = modesForCount(meta.count, modeSetsCache);
-        modeGroups = modesByGroupForCount(meta.count, modeSetsCache);
+        availableModes = modesForCount(meta.count, TuningUtils.modeSetsCache);
+        modeGroups = modesByGroupForCount(meta.count, TuningUtils.modeSetsCache);
 
         if (!availableModes.length) {
             selectGroup.innerHTML = '';
@@ -732,7 +627,7 @@ const buildModeField = ({ node, setting, portIndex, connected, context }) => {
             return;
         }
 
-        const currentVal = resolveModeValue(current.settings?.[setting.key] ?? '', context);
+        const currentVal = resolveModeValue(current.settings?.[settingKey] ?? '', context);
         let currentMode = availableModes.find((m) => m.id === currentVal) ?? availableModes[0];
         let currentGroup = currentMode?.group;
 
@@ -779,7 +674,7 @@ const buildModeField = ({ node, setting, portIndex, connected, context }) => {
         const current = getNode(context, node.id);
         const tuningPath = resolveTuningValue(current?.settings?.tuning ?? DEFAULT_TUNING, context);
         const groupsMap = tuningMetaCache.get(tuningPath)
-            ? modesByGroupForCount(tuningMetaCache.get(tuningPath).count, modeSetsCache)
+            ? modesByGroupForCount(tuningMetaCache.get(tuningPath).count, TuningUtils.modeSetsCache)
             : modeGroups;
         modeGroups = groupsMap;
         const modes = groupsMap.get(selectGroup.value) ?? [];
@@ -794,7 +689,7 @@ const buildModeField = ({ node, setting, portIndex, connected, context }) => {
             op.textContent = m.name;
             selectMode.appendChild(op);
         });
-        const existing = current?.settings?.[setting.key];
+        const existing = current?.settings?.[settingKey];
         selectMode.value = existing === '' ? '' : modes[0]?.id ?? '';
         commit();
     });
@@ -803,17 +698,22 @@ const buildModeField = ({ node, setting, portIndex, connected, context }) => {
 
     populateModeSelects();
 
-    const modeCol = document.createElement('div');
-    modeCol.className = 'mode-selects';
-    modeCol.append(selectGroup, selectMode);
-    return modeCol;
+    const modeSelects = document.createElement('div');
+    modeSelects.className = 'mode-selects';
+    modeSelects.append(selectGroup, selectMode);
+
+    const modeBlock = document.createElement('div');
+    modeBlock.className = 'mode-block';
+    modeBlock.append(buildModeTonicToggle(node, context), modeSelects);
+    return modeBlock;
 };
 
 const buildTonicField = ({ node, setting, portIndex, connected, context }) => {
+    const settingKey = setting.settingKey ?? setting.key;
     const selectTonic = document.createElement('select');
     selectTonic.className = 'setting-field';
     selectTonic.dataset.portIndex = portIndex;
-    selectTonic.dataset.settingKey = setting.key;
+    selectTonic.dataset.settingKey = settingKey;
     selectTonic.dataset.tonicField = 'tonic';
     selectTonic.disabled = connected;
     if (setting.title) selectTonic.title = setting.title;
@@ -854,14 +754,11 @@ const buildTonicField = ({ node, setting, portIndex, connected, context }) => {
             selectTonic.appendChild(op);
         }
 
-        const currentVal = clampTonicToCount(
-            node.settings?.[setting.key] ?? DEFAULT_TONIC,
-            meta.count
-        );
+        const currentVal = clampTonicToCount(node.settings?.[settingKey] ?? DEFAULT_TONIC, meta.count);
         selectTonic.value = String(currentVal);
 
         if (!connected) {
-            current.settings[setting.key] = currentVal;
+            current.settings[settingKey] = currentVal;
         }
 
         selectTonic.disabled = connected || !options.length;
@@ -874,7 +771,7 @@ const buildTonicField = ({ node, setting, portIndex, connected, context }) => {
         const count = tuningMetaCache.get(tuningPath)?.count;
         const val = selectTonic.value === '' ? '' : clampTonicToCount(selectTonic.value, count);
         selectTonic.value = String(val);
-        current.settings[setting.key] = val;
+        current.settings[settingKey] = val;
         if (context.updateCodePanel) context.updateCodePanel();
         if (context.propagateValuesFrom) context.propagateValuesFrom(current.id);
         if (context.autoSave) context.autoSave();
@@ -889,13 +786,14 @@ const buildTonicField = ({ node, setting, portIndex, connected, context }) => {
 };
 
 const renderSettingField = ({ node, setting, portIndex, connected, context }) => {
-    if (setting.key === 'tuning') {
+    const settingKey = setting.settingKey ?? setting.key;
+    if (settingKey === 'tuning') {
         return buildTuningField({ node, setting, portIndex, connected, context });
     }
-    if (setting.key === 'mode') {
+    if (settingKey === 'mode') {
         return buildModeField({ node, setting, portIndex, connected, context });
     }
-    if (setting.key === 'tonic') {
+    if (settingKey === 'tonic') {
         return buildTonicField({ node, setting, portIndex, connected, context });
     }
     return null;

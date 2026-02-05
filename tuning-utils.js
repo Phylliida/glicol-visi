@@ -18,7 +18,67 @@
 
     const TUNINGS_DIR = path ? path.join(__dirname, 'tunings') : null;
     const EPS = 1e-6;
+    const DEFAULT_TUNING = 'equal_temperament/et_<=12/fj-12tet.scl';
+    const DEFAULT_MODE = 'ionian';
+    const DEFAULT_TONIC = 0; // 0 = "A" in our display list
+    const TONIC_OPTIONS = [
+        { value: 0, label: 'A' },
+        { value: 1, label: 'A#/Bb' },
+        { value: 2, label: 'B' },
+        { value: 3, label: 'C' },
+        { value: 4, label: 'C#/Db' },
+        { value: 5, label: 'D' },
+        { value: 6, label: 'D#/Eb' },
+        { value: 7, label: 'E' },
+        { value: 8, label: 'F' },
+        { value: 9, label: 'F#/Gb' },
+        { value: 10, label: 'G' },
+        { value: 11, label: 'G#/Ab' }
+    ];
+
+    let tuningListCache = null;
+    let tuningListPromise = null;
+    let tuningHierarchy = null;
+    let modeSetsCache = MODE_SETS && MODE_SETS.length ? MODE_SETS : null;
+    let modeListPromise = null;
     const almost = (a, b, eps = EPS) => Math.abs(a - b) < eps;
+
+    const buildTuningHierarchy = (list) => {
+        const categories = new Set();
+        const subs = new Map(); // cat -> [subs]
+        const files = new Map(); // `${cat}/${sub}` -> [paths]
+
+        list.forEach((p) => {
+            const parts = p.split('/');
+            const cat = parts[0] || '';
+            const sub = parts.length > 2 ? parts[1] : '';
+            categories.add(cat);
+            const subSet = subs.get(cat) ?? new Set();
+            subSet.add(sub);
+            subs.set(cat, subSet);
+            const key = `${cat}/${sub}`;
+            const arr = files.get(key) ?? [];
+            arr.push(p);
+            files.set(key, arr);
+        });
+
+        return {
+            categories: Array.from(categories).sort(),
+            subs: new Map(
+                Array.from(subs.entries()).map(([cat, set]) => [cat, Array.from(set).sort()])
+            ),
+            files
+        };
+    };
+
+    const splitTuningPath = (p) => {
+        const parts = p.split('/');
+        const category = parts[0] || '';
+        const subcategory = parts.length > 2 ? parts[1] : '';
+        const file =
+            parts.length > 2 ? parts.slice(2).join('/') : parts.length === 2 ? parts[1] : parts[0];
+        return { category, subcategory, file };
+    };
 
     const parseValue = (text) => {
         if (!text) return null;
@@ -249,6 +309,113 @@
     };
 
     // ---------------------------------------------------------------------------
+    // Shared caches & fetch helpers (browser-focused, used by notes node UI)
+    // ---------------------------------------------------------------------------
+
+    const getModeSets = (context = {}) => {
+        if (modeSetsCache) return Promise.resolve(modeSetsCache);
+        if (modeListPromise) return modeListPromise;
+
+        if (MODE_SETS && MODE_SETS.length) {
+            modeSetsCache = MODE_SETS;
+            return Promise.resolve(modeSetsCache);
+        }
+
+        if (typeof fetch !== 'function') {
+            modeSetsCache = [];
+            return Promise.resolve(modeSetsCache);
+        }
+
+        modeListPromise = fetch('/modes.json')
+            .then((res) => res.json())
+            .then((data) => {
+                modeSetsCache = Array.isArray(data) ? data : [];
+                if (context.render) context.render();
+                return modeSetsCache;
+            })
+            .catch((err) => {
+                console.error('Failed to load modes', err);
+                modeSetsCache = [];
+                return modeSetsCache;
+            });
+        return modeListPromise;
+    };
+
+    const getTuningList = (context = {}) => {
+        if (tuningListCache) return Promise.resolve(tuningListCache);
+        if (tuningListPromise) return tuningListPromise;
+
+        if (typeof fetch !== 'function') {
+            tuningListCache = [];
+            tuningHierarchy = buildTuningHierarchy(tuningListCache);
+            return Promise.resolve(tuningListCache);
+        }
+
+        tuningListPromise = fetch('/api/tunings')
+            .then((res) => res.json())
+            .then((data) => {
+                tuningListCache = Array.isArray(data.tunings) ? data.tunings : [];
+                tuningHierarchy = buildTuningHierarchy(tuningListCache);
+                if (context.render) context.render();
+                return tuningListCache;
+            })
+            .catch((err) => {
+                console.error('Failed to load tunings', err);
+                tuningListCache = [];
+                tuningHierarchy = buildTuningHierarchy(tuningListCache);
+                return tuningListCache;
+            });
+        return tuningListPromise;
+    };
+
+    const resolveTuningValue = (raw, context = {}) => {
+        const val = (raw ?? '').trim();
+        const list = tuningListCache;
+
+        if (!list) {
+            getTuningList(context).then(() => context.render && context.render());
+            return val || DEFAULT_TUNING;
+        }
+
+        if (!val) return DEFAULT_TUNING;
+
+        const lower = val.toLowerCase();
+
+        const exact = list.find((t) => t === val);
+        if (exact) return exact;
+
+        const ci = list.find((t) => t.toLowerCase() === lower);
+        if (ci) return ci;
+
+        const base = lower.replace(/^.*[\\/]/, '');
+        const baseMatch = list.find(
+            (t) => t.toLowerCase().endsWith(`/${base}`) || t.toLowerCase() === base
+        );
+        if (baseMatch) return baseMatch;
+
+        return DEFAULT_TUNING;
+    };
+
+    const resolveModeValue = (raw, context = {}) => {
+        const val = (raw ?? '').trim();
+        const all = flattenModes(modeSetsCache ?? MODE_SETS);
+        if (!all.length) {
+            getModeSets(context).then(() => context.render && context.render());
+        }
+        if (val === '') return '';
+        const exact = all.find((m) => m.id === val);
+        if (exact) return exact.id;
+        const ci = all.find((m) => m.id.toLowerCase() === val.toLowerCase());
+        return ci ? ci.id : DEFAULT_MODE;
+    };
+
+    const resolveTonicValue = (raw) => {
+        const n = parseInt(raw, 10);
+        if (!Number.isFinite(n)) return DEFAULT_TONIC;
+        return Math.max(0, n);
+    };
+
+    // ---------------------------------------------------------------------------
     // Modal vocabulary (major / minor / color / symmetric) - Node-focused helpers
     // ---------------------------------------------------------------------------
 
@@ -275,7 +442,7 @@
         listAllModes,
         listModesForTuning,
         getModeById,
-        // Browser helpers
+        // Browser helpers & shared tuning utilities
         normalizeSteps,
         parseValue,
         parseTuningTextToMeta,
@@ -286,8 +453,26 @@
         modesForCount,
         modesByGroupForCount,
         tonicOptionsForCount,
-        clampTonicToCount
+        clampTonicToCount,
+        // Tuning selection helpers
+        DEFAULT_TUNING,
+        DEFAULT_MODE,
+        DEFAULT_TONIC,
+        TONIC_OPTIONS,
+        getModeSets,
+        getTuningList,
+        resolveTuningValue,
+        resolveModeValue,
+        resolveTonicValue,
+        splitTuningPath,
+        buildTuningHierarchy
     };
+
+    Object.defineProperties(exportsObj, {
+        tuningListCache: { get: () => tuningListCache },
+        tuningHierarchy: { get: () => tuningHierarchy },
+        modeSetsCache: { get: () => modeSetsCache }
+    });
 
     if (isNode) {
         module.exports = exportsObj;
