@@ -553,8 +553,12 @@ const updateCodePanel = () => {
             return parseIdNumber(a.id) - parseIdNumber(b.id);
         })
         .map(node => {
-            const codeValue = node.settings?.code ?? node.value ?? '';
-            return String(codeValue).replace(/\r?\n/g, ' ');
+            const codeSetting = node.settings?.code;
+            const codeValue =
+                codeSetting !== undefined && codeSetting !== ''
+                    ? codeSetting
+                    : node.value ?? '';
+            return String(codeValue);
         })
         .join('\n');
 
