@@ -371,4 +371,28 @@ const computeFrequencyNotation = (node, context = {}) => {
     return serializeNotation(parsed.columns, mapFilledValue);
 };
 
-export { computeFrequencyNotation };
+const renderNotesExpression = (notation) => `n("${String(notation ?? DEFAULT_NOTATION)}")`;
+
+const renderFreqExpression = (notation) => `freq("${String(notation ?? DEFAULT_NOTATION)}")`;
+
+const unwrapNotesExpression = (raw) => {
+    const text = String(raw ?? '').trim();
+    const modernMatch = /^n\((['"])([\s\S]*)\1\)$/.exec(text);
+    if (modernMatch) return modernMatch[2];
+    const legacyMatch = /^n'\(([\s\S]*)'\)$/.exec(text);
+    return legacyMatch ? legacyMatch[1] : text;
+};
+
+const unwrapFreqExpression = (raw) => {
+    const text = String(raw ?? '').trim();
+    const match = /^freq\((['"])([\s\S]*)\1\)$/.exec(text);
+    return match ? match[2] : text;
+};
+
+export {
+    computeFrequencyNotation,
+    renderNotesExpression,
+    renderFreqExpression,
+    unwrapNotesExpression,
+    unwrapFreqExpression
+};

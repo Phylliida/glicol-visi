@@ -7,7 +7,12 @@ import {
     clampNumber
 } from './constants.js';
 import { alignOutputsToInputs } from './helpers.js';
-import { computeFrequencyNotation } from './freq-compute.js';
+import {
+    computeFrequencyNotation,
+    renderFreqExpression,
+    renderNotesExpression,
+    unwrapNotesExpression
+} from './freq-compute.js';
 
 const notesUiInstances = new Map();
 
@@ -184,7 +189,7 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
     const notationInput = document.createElement('input');
     notationInput.type = 'text';
     notationInput.className = 'notes-notation setting-field';
-    notationInput.value = state.notation;
+    notationInput.value = renderNotesExpression(state.notation);
     const notationCopyInput = document.createElement('input');
     notationCopyInput.type = 'text';
     notationCopyInput.className = 'notes-notation-copy setting-field';
@@ -194,7 +199,9 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
     const getCurrentNode = () => context.state?.nodes?.get(node.id) ?? node;
     const refreshFrequencyCopy = () => {
         const current = getCurrentNode();
-        notationCopyInput.value = computeFrequencyNotation(current, context);
+        notationCopyInput.value = renderFreqExpression(
+            computeFrequencyNotation(current, context)
+        );
     };
     notationInput.addEventListener('mousedown', (e) => e.stopPropagation());
     notationInput.addEventListener('click', (e) => e.stopPropagation());
@@ -206,7 +213,8 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
         updateNotation(true);
     });
     notationInput.addEventListener('input', () => {
-        const parsed = parseNotation(notationInput.value);
+        const rawNotation = unwrapNotesExpression(notationInput.value);
+        const parsed = parseNotation(rawNotation);
         if (!parsed.ok) {
             notationInput.classList.add('invalid');
             return;
@@ -216,9 +224,11 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
         if (current?.settings) {
             const previewNode = {
                 ...current,
-                settings: { ...current.settings, [setting.settingKey]: notationInput.value }
+                settings: { ...current.settings, [setting.settingKey]: rawNotation }
             };
-            notationCopyInput.value = computeFrequencyNotation(previewNode, context);
+            notationCopyInput.value = renderFreqExpression(
+                computeFrequencyNotation(previewNode, context)
+            );
         }
         applyParsedBoard(parsed.columns, true, { preserveRows: true });
     });
@@ -489,9 +499,11 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
     const updateNotation = (skipBoard) => {
         if (root.dataset.typing === 'true') return;
         const cols = skipBoard ? null : boardToColumns(board);
-        const notationText = skipBoard ? notationInput.value : `<${cols.join(' ')}>`;
+        const notationText = skipBoard
+            ? unwrapNotesExpression(notationInput.value)
+            : `<${cols.join(' ')}>`;
         notationInput.classList.remove('invalid');
-        notationInput.value = notationText;
+        notationInput.value = renderNotesExpression(notationText);
         state.notation = notationText;
         const current = getCurrentNode();
         if (current?.settings) {
@@ -778,10 +790,11 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
             setDisabled(connected);
         },
         setNotation: (text) => {
-            const parsed = parseNotation(text);
+            const normalizedText = unwrapNotesExpression(String(text ?? DEFAULT_NOTATION));
+            const parsed = parseNotation(normalizedText);
             if (!parsed.ok) return;
-            state.notation = text;
-            notationInput.value = text;
+            state.notation = normalizedText;
+            notationInput.value = renderNotesExpression(normalizedText);
             applyParsedBoard(parsed.columns, true, { preserveRows: true });
             setDisabled(connected);
         },

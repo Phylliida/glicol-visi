@@ -15,7 +15,13 @@ import {
     resolveTonicValue,
     clampNumber
 } from './constants.js';
-import { computeFrequencyNotation } from './freq-compute.js';
+import {
+    computeFrequencyNotation,
+    renderNotesExpression,
+    renderFreqExpression,
+    unwrapNotesExpression,
+    unwrapFreqExpression
+} from './freq-compute.js';
 
 const FREQ_INPUT_PORT_INDEX = 1;
 
@@ -52,14 +58,18 @@ const getOutputValue = (node, portIndex, context = {}) => {
     if (portIndex === 0) return node.settings?.tuning ?? '';
     if (portIndex === 1) return node.settings?.mode ?? '';
     if (portIndex === 2) return node.settings?.tonic === '' ? '' : String(node.settings?.tonic ?? '');
-    if (portIndex === 3) return node.settings?.notes ?? DEFAULT_NOTATION;
+    if (portIndex === 3) return renderNotesExpression(node.settings?.notes ?? DEFAULT_NOTATION);
     if (portIndex === 4) {
         const hasFreqIncoming =
             typeof context?.hasIncomingConnection === 'function'
                 ? context.hasIncomingConnection(node.id, FREQ_INPUT_PORT_INDEX)
                 : false;
-        if (hasFreqIncoming) return String(node.settings?.freq ?? '');
-        return computeFrequencyNotation(node, context);
+        if (hasFreqIncoming) {
+            const incomingFreq = String(node.settings?.freq ?? '');
+            const normalized = unwrapFreqExpression(unwrapNotesExpression(incomingFreq));
+            return renderFreqExpression(normalized);
+        }
+        return renderFreqExpression(computeFrequencyNotation(node, context));
     }
     if (portIndex === 5) {
         return clampNumber(
@@ -108,8 +118,14 @@ const resolveIncomingValue = (node, settingKey, incoming, context = {}) => {
     if (settingKey === 'tuning') return resolveTuningValue(incoming, context);
     if (settingKey === 'mode') return resolveModeValue(incoming, context);
     if (settingKey === 'tonic') return resolveTonicValue(incoming);
-    if (settingKey === 'notes') return String(incoming ?? '');
-    if (settingKey === 'freq') return String(incoming ?? '');
+    if (settingKey === 'notes') {
+        const raw = String(incoming ?? '');
+        return unwrapNotesExpression(unwrapFreqExpression(raw));
+    }
+    if (settingKey === 'freq') {
+        const raw = String(incoming ?? '');
+        return unwrapFreqExpression(unwrapNotesExpression(raw));
+    }
     if (settingKey === 'rows') {
         const fallback = clampNumber(
             node?.settings?.rows ?? node?.settings?.noteRows,
