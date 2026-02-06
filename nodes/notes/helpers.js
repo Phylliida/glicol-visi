@@ -79,6 +79,9 @@ const alignOutputsToInputs = (nodeEl) => {
         clearLabelExtras(inRow);
     });
 
+    let shiftAfterPinnedFreq = 0;
+    let pinnedFreqSeen = false;
+
     orderedOutputs.forEach((outRow, idx) => {
         clearLabelExtras(outRow);
         outRow.style.minHeight = '';
@@ -92,6 +95,12 @@ const alignOutputsToInputs = (nodeEl) => {
             pinFreqToCopyLine
                 ? freqInputRow ?? inputs[idx]
                 : inputByKey.get(key) ?? inputs[idx];
+
+        if (pinnedFreqSeen && shiftAfterPinnedFreq > 0) {
+            outRow.style.position = 'relative';
+            outRow.style.top = `-${shiftAfterPinnedFreq}px`;
+        }
+
         const height = inRow?.offsetHeight;
         if (height) {
             outRow.style.minHeight = `${height}px`;
@@ -105,6 +114,8 @@ const alignOutputsToInputs = (nodeEl) => {
             const shift = rowHeight + (Number.isFinite(outputsGap) ? outputsGap : 0);
             outRow.style.position = 'relative';
             outRow.style.top = `-${shift}px`;
+            shiftAfterPinnedFreq = shift;
+            pinnedFreqSeen = true;
         }
         if (key === 'notes') {
             const copyOffset = getNotesCopyOffset(inRow);
