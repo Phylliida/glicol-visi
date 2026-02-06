@@ -26,6 +26,13 @@ const parseIdNumber = (id) => {
     const match = /_(\d+)$/.exec(id);
     return match ? parseInt(match[1], 10) : 0;
 };
+const NODE_MIN_WIDTH_PX = 150;
+const NODE_MIN_HEIGHT_PX = 56;
+const NOTES_MIN_COL_HEIGHT_PX = 10;
+const NODE_RESIZE_ICON_SVG =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" aria-hidden="true" focusable="false"><g transform="translate(512 0) scale(-1 1)"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32" d="M304 96h112v112m-10.23-101.8L111.98 400.02M208 416H96V304"/></g></svg>';
+const NODE_DELETE_ICON_SVG =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2.25" d="M6 6l12 12M18 6L6 18"/></svg>';
 
 // ============================================================================
 // STATE
@@ -254,7 +261,7 @@ const createNodeElement = (node) => {
 
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'node-delete';
-    deleteBtn.textContent = '×';
+    deleteBtn.innerHTML = NODE_DELETE_ICON_SVG;
     deleteBtn.title = 'Delete node';
 
     const confirmBox = document.createElement('div');
@@ -285,8 +292,8 @@ const createNodeElement = (node) => {
         confirmBox.classList.add('hidden');
     });
 
-    header.append(title, deleteBtn, confirmBox);
-    nodeEl.appendChild(header);
+    header.append(title);
+    nodeEl.append(header, deleteBtn, confirmBox);
 
     const headerExtras = renderHeaderExtrasForType(node, getNodeContext());
     if (headerExtras) nodeEl.appendChild(headerExtras);
@@ -402,29 +409,28 @@ const createNodeElement = (node) => {
     const resizeHandle = document.createElement('div');
     resizeHandle.className = 'node-resize';
     resizeHandle.title = 'Resize node';
+    resizeHandle.innerHTML = NODE_RESIZE_ICON_SVG;
     resizeHandle.addEventListener('mousedown', (e) => {
         e.stopPropagation();
         e.preventDefault();
         const el = e.currentTarget.closest('.node');
         if (!el) return;
 
-        const minNotesColHeightPx = 10;
-        const defaultMinNodeHeightPx = 56;
         const rect = el.getBoundingClientRect();
         const startWidth = rect.width / state.scale;
         const startHeight = rect.height / state.scale;
-        const cssMinWidth = parseFloat(getComputedStyle(el).minWidth || '150') || 150;
+        const cssMinWidth = parseFloat(getComputedStyle(el).minWidth || String(NODE_MIN_WIDTH_PX)) || NODE_MIN_WIDTH_PX;
         let minWidth = Math.min(startWidth, cssMinWidth);
         let minHeight = 0;
         const notesUi = el.querySelector('.notes-ui');
         if (notesUi) {
             const currentNotesColHeight =
-                parseFloat(getComputedStyle(notesUi).getPropertyValue('--notes-col-height')) || minNotesColHeightPx;
-            const notesHeightDelta = Math.max(0, currentNotesColHeight - minNotesColHeightPx);
+                parseFloat(getComputedStyle(notesUi).getPropertyValue('--notes-col-height')) || NOTES_MIN_COL_HEIGHT_PX;
+            const notesHeightDelta = Math.max(0, currentNotesColHeight - NOTES_MIN_COL_HEIGHT_PX);
             minHeight = Math.max(0, startHeight - notesHeightDelta);
         } else {
             const cssMinHeight = parseFloat(getComputedStyle(el).minHeight || '0') || 0;
-            minHeight = Math.max(defaultMinNodeHeightPx, cssMinHeight);
+            minHeight = Math.max(NODE_MIN_HEIGHT_PX, cssMinHeight);
         }
         minWidth = Math.min(minWidth, startWidth);
         minHeight = Math.min(minHeight, startHeight);

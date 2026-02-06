@@ -347,7 +347,17 @@ const buildModeTonicToggle = (node, context = {}) => {
     return toggleWrap;
 };
 
-const afterRender = (node, _nodeEl, context = {}) => {
+const moveRowsPortToTop = (nodeEl) => {
+    const inputs = nodeEl?.querySelector('.inputs');
+    if (!inputs) return;
+    const rowsPort = inputs.querySelector('.port-container.setting-port[data-setting-key="rows"]');
+    if (rowsPort && inputs.firstElementChild !== rowsPort) {
+        inputs.insertBefore(rowsPort, inputs.firstElementChild);
+    }
+};
+
+const afterRender = (node, nodeEl, context = {}) => {
+    moveRowsPortToTop(nodeEl);
     applyModeTonicVisibility(node.id, context);
 };
 

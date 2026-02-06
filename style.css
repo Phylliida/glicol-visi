@@ -195,21 +195,53 @@ body {
     border-color: #4a9eff;
 }
 
-.node-resize {
+.node-resize,
+.node-delete {
     position: absolute;
+    top: 6px;
     width: 14px;
     height: 14px;
-    left: 6px;
-    top: 6px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
     border-radius: 3px;
-    background: linear-gradient(135deg, #4a9eff, #ff6b6b);
+    background: #2f2f2f;
+    color: #f8fafc;
     opacity: 0.85;
-    cursor: nw-resize;
     pointer-events: auto;
+    transition: opacity 120ms ease, background 120ms ease, transform 80ms ease;
 }
 
-.node-resize:hover {
+.node-resize {
+    left: 6px;
+    cursor: nw-resize;
+}
+
+.node-delete {
+    right: 6px;
+    cursor: pointer;
+    z-index: 6;
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+.node-resize svg,
+.node-delete svg {
+    width: 10px;
+    height: 10px;
+    pointer-events: none;
+}
+
+.node-resize:hover,
+.node-delete:hover {
     opacity: 1;
+    background: #3a3a3a;
+}
+
+.node-resize:active,
+.node-delete:active {
+    transform: scale(0.96);
 }
 
 .node-header {
@@ -222,7 +254,7 @@ body {
     align-items: center;
     justify-content: center;
     position: relative;
-    padding-right: 1.4rem;
+    padding-right: 0;
 }
 
 .mode-tonic-toggle {
@@ -301,26 +333,10 @@ body {
     pointer-events: none;
 }
 
-.node-delete {
-    position: absolute;
-    right: 0;
-    top: -2px;
-    background: transparent;
-    border: none;
-    color: #777;
-    font-size: 0.95rem;
-    cursor: pointer;
-    line-height: 1;
-}
-
-.node-delete:hover {
-    color: #ff6b6b;
-}
-
 .node-delete-confirm {
     position: absolute;
-    right: 0;
-    top: 18px;
+    right: 6px;
+    top: 24px;
     background: #2f2f2f;
     border: 1px solid #555;
     border-radius: 4px;
@@ -482,6 +498,30 @@ body {
     align-items: flex-start;
     flex: 1;
     width: 100%;
+}
+
+.rows-setting-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex: 1;
+    width: 100%;
+    min-width: 0;
+}
+
+.rows-setting-controls .setting-field {
+    flex: 1;
+    min-width: 0;
+}
+
+.rows-setting-controls .rows-edit-toggle {
+    margin-left: auto;
+    align-self: flex-start;
+    flex: 0 0 auto;
+}
+
+.port-container.setting-port[data-setting-key="rows"] {
+    align-items: flex-start;
 }
 
 .tuning-selects select,

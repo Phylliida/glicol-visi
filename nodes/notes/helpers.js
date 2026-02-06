@@ -40,15 +40,47 @@ const alignOutputsToInputs = (nodeEl) => {
     });
     orderedOutputs.forEach((outRow) => outputsRoot.appendChild(outRow));
 
+    const clearLabelExtras = (row) => {
+        if (!row) return;
+        row.querySelectorAll('.port').forEach((port) => {
+            port.style.marginBottom = '';
+        });
+        row.querySelectorAll('.port-label').forEach((label) => {
+            label.style.marginBottom = '';
+        });
+    };
+
+    const getNotesCopyOffset = (inRow) => {
+        const copyInput = inRow?.querySelector('.notes-notation-copy');
+        if (!copyInput) return 0;
+        const notationRow = copyInput.closest('.notes-notation-row');
+        const gap = notationRow ? parseFloat(getComputedStyle(notationRow).rowGap || '0') : 0;
+        return copyInput.offsetHeight + (Number.isFinite(gap) ? gap : 0);
+    };
+
     orderedOutputs.forEach((outRow, idx) => {
+        clearLabelExtras(outRow);
         outRow.style.minHeight = '';
         outRow.style.alignItems = '';
         const key = normalizeKey(outRow.querySelector('.port-label')?.textContent);
         const inRow = inputByKey.get(key) ?? inputs[idx];
+        clearLabelExtras(inRow);
         const height = inRow?.offsetHeight;
         if (height) {
             outRow.style.minHeight = `${height}px`;
             outRow.style.alignItems = key === 'notes' ? 'flex-end' : 'center';
+        }
+        if (key === 'notes') {
+            const copyOffset = getNotesCopyOffset(inRow);
+            if (copyOffset > 0) {
+                const inLabel = inRow?.querySelector('.port-label');
+                const inPort = inRow?.querySelector('.port.input');
+                const outLabel = outRow.querySelector('.port-label');
+                const outPort = outRow.querySelector('.port.output');
+                [inLabel, inPort, outLabel, outPort].forEach((el) => {
+                    if (el) el.style.marginBottom = `${copyOffset}px`;
+                });
+            }
         }
     });
 };

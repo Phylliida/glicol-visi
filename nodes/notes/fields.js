@@ -3,7 +3,9 @@ import {
     DEFAULT_TUNING,
     DEFAULT_MODE,
     DEFAULT_TONIC,
+    DEFAULT_NOTE_ROWS,
     TONIC_OPTIONS,
+    clampNumber,
     clampTonicToCount,
     resolveTuningValue,
     resolveModeValue,
@@ -18,7 +20,11 @@ import {
 } from './constants.js';
 import { getNode } from './helpers.js';
 import { refreshModeAndTonicForNode, buildModeTonicToggle } from './mode-tonic.js';
-import { createNotesUi } from './board-ui.js';
+import { createNotesUi, notesUiInstances } from './board-ui.js';
+import { NOTES_CONFIG } from './config.js';
+
+const NOTES_EDIT_ICON_SVG =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="currentColor" d="M5 19h1.425L16.2 9.225L14.775 7.8L5 17.575zm-1 2q-.425 0-.712-.288T3 20v-2.425q0-.4.15-.763t.425-.637L16.2 3.575q.3-.275.663-.425t.762-.15t.775.15t.65.45L20.425 5q.3.275.437.65T21 6.4q0 .4-.138.763t-.437.662l-12.6 12.6q-.275.275-.638.425t-.762.15zM19 6.4L17.6 5zm-3.525 2.125l-.7-.725L16.2 9.225z"/></svg>';
 
 const buildTuningField = ({ node, setting, portIndex, connected, context }) => {
     const settingKey = setting.settingKey ?? setting.key;
@@ -410,8 +416,91 @@ const buildTonicField = ({ node, setting, portIndex, connected, context }) => {
     return tonicCol;
 };
 
+const buildRowsField = ({ node, setting, portIndex, connected, context }) => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'rows-setting-controls';
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.min = '1';
+    input.max = '32';
+    input.className = 'setting-field';
+    input.dataset.portIndex = portIndex;
+    input.dataset.settingKey = setting.settingKey ?? setting.key;
+    input.disabled = connected;
+    if (setting.title) input.title = setting.title;
+    input.value = String(
+        clampNumber(node.settings?.rows ?? node.settings?.noteRows, 1, 32, DEFAULT_NOTE_ROWS)
+    );
+    input.addEventListener('mousedown', (evt) => evt.stopPropagation());
+    input.addEventListener('click', (evt) => evt.stopPropagation());
+    input.addEventListener('input', () => {
+        const current = getNode(context, node.id);
+        if (!current) return;
+        const next = clampNumber(
+            input.value,
+            1,
+            32,
+            clampNumber(current.settings?.rows ?? current.settings?.noteRows, 1, 32, DEFAULT_NOTE_ROWS)
+        );
+        input.value = String(next);
+        current.settings.rows = next;
+        current.settings.noteRows = next;
+        const instance = notesUiInstances.get(current.id);
+        if (instance && typeof instance.setRows === 'function') {
+            instance.setRows(next);
+            return;
+        }
+        if (context.propagateValuesFrom) context.propagateValuesFrom(current.id);
+        if (context.updateCodePanel) context.updateCodePanel();
+        if (context.autoSave) context.autoSave();
+    });
+
+    const inputDefs =
+        typeof context?.getInputDefinitions === 'function'
+            ? context.getInputDefinitions(NOTES_CONFIG)
+            : [];
+    const notesPortIndex = inputDefs.findIndex((d) => d.settingKey === 'notes');
+    const notesConnected =
+        notesPortIndex !== -1 && context?.hasIncomingConnection
+            ? context.hasIncomingConnection(node.id, notesPortIndex)
+            : false;
+
+    const editToggle = document.createElement('button');
+    editToggle.type = 'button';
+    editToggle.className = 'notes-edit-toggle rows-edit-toggle';
+    editToggle.innerHTML = NOTES_EDIT_ICON_SVG;
+    editToggle.setAttribute('aria-label', 'Toggle notes edit mode');
+    editToggle.setAttribute('aria-pressed', String(node.settings?.noteEditMode !== false));
+    editToggle.classList.toggle('active', node.settings?.noteEditMode !== false);
+    editToggle.disabled = notesConnected;
+    editToggle.addEventListener('mousedown', (evt) => evt.stopPropagation());
+    editToggle.addEventListener('click', (evt) => {
+        evt.stopPropagation();
+        const current = getNode(context, node.id);
+        if (!current) return;
+        const instance = notesUiInstances.get(current.id);
+        if (instance && typeof instance.toggleEditMode === 'function') {
+            const active = instance.toggleEditMode();
+            editToggle.classList.toggle('active', active);
+            editToggle.setAttribute('aria-pressed', String(active));
+            return;
+        }
+        const next = !(current.settings?.noteEditMode !== false);
+        current.settings.noteEditMode = next;
+        editToggle.classList.toggle('active', next);
+        editToggle.setAttribute('aria-pressed', String(next));
+        if (context.autoSave) context.autoSave();
+    });
+
+    wrapper.append(input, editToggle);
+    return wrapper;
+};
+
 const renderSettingField = ({ node, setting, portIndex, connected, context }) => {
     const settingKey = setting.settingKey ?? setting.key;
+    if (settingKey === 'rows') {
+        return buildRowsField({ node, setting, portIndex, connected, context });
+    }
     if (settingKey === 'tuning') {
         return buildTuningField({ node, setting, portIndex, connected, context });
     }
@@ -427,4 +516,4 @@ const renderSettingField = ({ node, setting, portIndex, connected, context }) =>
     return null;
 };
 
-export { buildTuningField, buildModeField, buildTonicField, renderSettingField };
+export { buildTuningField, buildModeField, buildTonicField, buildRowsField, renderSettingField };

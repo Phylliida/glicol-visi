@@ -1,7 +1,10 @@
 import {
+    TuningUtils,
+    tuningMetaCache,
     DEFAULT_TUNING,
     DEFAULT_MODE,
     DEFAULT_TONIC,
+    TONIC_OPTIONS,
     DEFAULT_NOTATION,
     DEFAULT_NOTE_ROWS,
     DEFAULT_NOTE_COL_HEIGHT,
@@ -9,8 +12,37 @@ import {
     DEFAULT_NOTE_BUTTON_SCALE,
     resolveTuningValue,
     resolveModeValue,
-    resolveTonicValue
+    resolveTonicValue,
+    clampNumber
 } from './constants.js';
+
+const getModeDegreeCount = (modeId, context = {}) => {
+    const modeSets = TuningUtils.modeSetsCache;
+    if (!Array.isArray(modeSets) || !modeSets.length) return null;
+    const resolvedModeId = resolveModeValue(modeId, context);
+    for (const group of modeSets) {
+        const modes = Array.isArray(group?.modes) ? group.modes : [];
+        const mode = modes.find((m) => m?.id === resolvedModeId);
+        if (mode && Array.isArray(mode.degrees) && mode.degrees.length) {
+            return mode.degrees.length;
+        }
+    }
+    return null;
+};
+
+const inferDefaultRows = (node, context = {}) => {
+    const selectedMode = String(node?.settings?.mode ?? '').trim();
+    if (selectedMode) {
+        const modeCount = getModeDegreeCount(selectedMode, context);
+        if (Number.isFinite(modeCount) && modeCount > 0) return modeCount;
+    }
+
+    const tuningPath = resolveTuningValue(node?.settings?.tuning ?? DEFAULT_TUNING, context);
+    const tuningCount = tuningMetaCache.get(tuningPath)?.count;
+    if (Number.isFinite(tuningCount) && tuningCount > 0) return tuningCount;
+
+    return TONIC_OPTIONS.length || 12;
+};
 
 const getOutputValue = (node, portIndex) => {
     if (!node) return undefined;
@@ -18,17 +50,36 @@ const getOutputValue = (node, portIndex) => {
     if (portIndex === 1) return node.settings?.mode ?? '';
     if (portIndex === 2) return node.settings?.tonic === '' ? '' : String(node.settings?.tonic ?? '');
     if (portIndex === 3) return node.settings?.notes ?? DEFAULT_NOTATION;
+    if (portIndex === 4) return node.settings?.freq ?? node.settings?.notes ?? DEFAULT_NOTATION;
+    if (portIndex === 5) {
+        return clampNumber(
+            node.settings?.rows ?? node.settings?.noteRows,
+            1,
+            32,
+            DEFAULT_NOTE_ROWS
+        );
+    }
     return node.value;
 };
 
-const ensureSettings = (node) => {
+const ensureSettings = (node, context = {}) => {
     if (node.settings.hideModeTonic === undefined) {
         node.settings.hideModeTonic = false;
     }
     if (node.settings.notes === undefined) {
         node.settings.notes = DEFAULT_NOTATION;
     }
-    if (node.settings.noteRows === undefined) node.settings.noteRows = DEFAULT_NOTE_ROWS;
+    if (node.settings.freq === undefined) {
+        node.settings.freq = node.settings.notes;
+    }
+    const inferredRows = clampNumber(inferDefaultRows(node, context), 1, 32, DEFAULT_NOTE_ROWS);
+    const configuredRows =
+        node.settings.rows !== undefined && node.settings.rows !== ''
+            ? node.settings.rows
+            : node.settings.noteRows;
+    const normalizedRows = clampNumber(configuredRows, 1, 32, inferredRows);
+    node.settings.rows = normalizedRows;
+    node.settings.noteRows = normalizedRows;
     const legacyDefaultHeights = new Set([190, 96, 64, 4]);
     const rawNoteColHeight = Number(node.settings.noteColHeight);
     if (
@@ -48,6 +99,16 @@ const resolveIncomingValue = (node, settingKey, incoming, context = {}) => {
     if (settingKey === 'mode') return resolveModeValue(incoming, context);
     if (settingKey === 'tonic') return resolveTonicValue(incoming);
     if (settingKey === 'notes') return String(incoming ?? '');
+    if (settingKey === 'freq') return String(incoming ?? '');
+    if (settingKey === 'rows') {
+        const fallback = clampNumber(
+            node?.settings?.rows ?? node?.settings?.noteRows,
+            1,
+            32,
+            DEFAULT_NOTE_ROWS
+        );
+        return clampNumber(incoming, 1, 32, fallback);
+    }
     return incoming;
 };
 

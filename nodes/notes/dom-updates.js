@@ -1,8 +1,8 @@
-import { DEFAULT_NOTATION } from './constants.js';
+import { DEFAULT_NOTATION, DEFAULT_NOTE_ROWS, clampNumber } from './constants.js';
 import { notesUiInstances } from './board-ui.js';
 import { updateTuningFields, updateModeFields, updateTonicField } from './mode-tonic.js';
 
-const updateSettingFieldDom = ({ node, settingKey, portIndex, value, context }) => {
+const updateSettingFieldDom = ({ node, nodeEl, settingKey, portIndex, value, context }) => {
     const handled =
         settingKey === 'tuning'
             ? (updateTuningFields(node.id, portIndex, value, context), true)
@@ -19,6 +19,22 @@ const updateSettingFieldDom = ({ node, settingKey, portIndex, value, context }) 
                             }
                             return false;
                         })()
+                        : settingKey === 'rows'
+                            ? (() => {
+                                const next = clampNumber(value, 1, 32, DEFAULT_NOTE_ROWS);
+                                const rowsField = nodeEl?.querySelector(
+                                    `input.setting-field[data-port-index="${portIndex}"][data-setting-key="rows"]`
+                                );
+                                if (rowsField && rowsField !== document.activeElement) {
+                                    rowsField.value = String(next);
+                                }
+                                const instance = notesUiInstances.get(node.id);
+                                if (instance && typeof instance.setRows === 'function') {
+                                    instance.setRows(next);
+                                    return true;
+                                }
+                                return Boolean(rowsField);
+                            })()
                         : false;
     return handled;
 };

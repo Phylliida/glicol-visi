@@ -58,8 +58,6 @@ const FLOAT_ZOOM_THRESHOLD = 1.8;
 const FLOAT_TOP_MARGIN = 10;
 const FLOAT_BOTTOM_MARGIN = 10;
 const FLOAT_RIGHT_MARGIN = 10;
-const NOTES_EDIT_ICON_SVG =
-    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="currentColor" d="M5 19h1.425L16.2 9.225L14.775 7.8L5 17.575zm-1 2q-.425 0-.712-.288T3 20v-2.425q0-.4.15-.763t.425-.637L16.2 3.575q.3-.275.663-.425t.762-.15t.775.15t.65.45L20.425 5q.3.275.437.65T21 6.4q0 .4-.138.763t-.437.662l-12.6 12.6q-.275.275-.638.425t-.762.15zM19 6.4L17.6 5zm-3.525 2.125l-.7-.725L16.2 9.225z"/></svg>';
 const NOTES_REMOVE_ICON_SVG =
     '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2.25" d="M6 12h12"/></svg>';
 
@@ -68,9 +66,11 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
     const root = document.createElement('div');
     root.className = 'notes-ui';
     root.dataset.portIndex = portIndex;
+    const configuredRows =
+        settings.rows !== undefined && settings.rows !== '' ? settings.rows : settings.noteRows;
 
     const state = {
-        rows: clampNumber(settings.noteRows, 1, 32, DEFAULT_NOTE_ROWS),
+        rows: clampNumber(configuredRows, 1, 32, DEFAULT_NOTE_ROWS),
         colHeight: clampNumber(settings.noteColHeight, MIN_NOTE_COL_HEIGHT, 600, DEFAULT_NOTE_COL_HEIGHT),
         containerWidth: clampNumber(settings.noteContainerWidth, 120, 1200, DEFAULT_NOTE_CONTAINER_WIDTH),
         buttonScale: Math.max(0.1, Number(context?.state?.scale) || 1),
@@ -78,54 +78,41 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
         notation: settings.notes ?? DEFAULT_NOTATION
     };
 
-    const persistUiState = () => {
+    const syncRowsControls = (isDisabled = connected) => {
+        const nodeEl = root.closest('.node');
+        if (!nodeEl) return;
+        const field = nodeEl.querySelector('.setting-field[data-setting-key="rows"]');
+        if (field && field !== document.activeElement) {
+            field.value = String(state.rows);
+        }
+        const editToggle = nodeEl.querySelector('.rows-edit-toggle');
+        if (editToggle) {
+            editToggle.classList.toggle('active', state.editMode);
+            editToggle.setAttribute('aria-pressed', String(state.editMode));
+            editToggle.disabled = Boolean(isDisabled);
+        }
+    };
+
+    const persistUiState = ({ propagateRows = false, autoSave = true } = {}) => {
         const current = context.state?.nodes?.get(node.id) ?? node;
         if (!current?.settings) return;
+        const previousRows = clampNumber(
+            current.settings.rows ?? current.settings.noteRows,
+            1,
+            32,
+            state.rows
+        );
         current.settings.noteRows = state.rows;
+        current.settings.rows = state.rows;
         current.settings.noteColHeight = state.colHeight;
         current.settings.noteContainerWidth = state.containerWidth;
         current.settings.noteEditMode = state.editMode;
-        if (context.autoSave) context.autoSave();
+        syncRowsControls();
+        if (propagateRows && previousRows !== state.rows && context.propagateValuesFrom) {
+            context.propagateValuesFrom(current.id);
+        }
+        if (autoSave && context.autoSave) context.autoSave();
     };
-
-    const controls = document.createElement('div');
-    controls.className = 'notes-controls';
-
-    const makeLabel = (text, input) => {
-        const label = document.createElement('label');
-        label.textContent = text;
-        label.appendChild(input);
-        return label;
-    };
-
-    const rowsInput = document.createElement('input');
-    rowsInput.type = 'number';
-    rowsInput.min = '1';
-    rowsInput.max = '32';
-    rowsInput.value = String(state.rows);
-    rowsInput.addEventListener('mousedown', (e) => e.stopPropagation());
-    rowsInput.addEventListener('click', (e) => e.stopPropagation());
-    rowsInput.addEventListener('input', () => {
-        const next = clampNumber(rowsInput.value, 1, 32, state.rows);
-        rowsInput.value = String(next);
-        state.rows = next;
-        applyRowChange();
-        persistUiState();
-    });
-    controls.append(makeLabel('Rows', rowsInput));
-
-    const editToggle = document.createElement('button');
-    editToggle.type = 'button';
-    editToggle.className = 'notes-edit-toggle';
-    editToggle.innerHTML = NOTES_EDIT_ICON_SVG;
-    editToggle.setAttribute('aria-label', 'Toggle notes edit mode');
-    editToggle.setAttribute('aria-pressed', String(state.editMode));
-    editToggle.addEventListener('mousedown', (e) => e.stopPropagation());
-    editToggle.addEventListener('click', (e) => {
-        e.stopPropagation();
-        setEditMode(!state.editMode);
-    });
-    controls.append(editToggle);
 
     const boardShell = document.createElement('div');
     boardShell.className = 'notes-board-shell';
@@ -220,25 +207,25 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
             return;
         }
         notationInput.classList.remove('invalid');
-        applyParsedBoard(parsed.columns, true);
+        applyParsedBoard(parsed.columns, true, { preserveRows: true });
     });
     notationRow.append(notationInput, notationCopyInput);
 
-    root.append(controls, boardShell, notationRow);
+    root.append(boardShell, notationRow);
 
     const stopPointer = (el) => {
         el.addEventListener('mousedown', (e) => e.stopPropagation());
         el.addEventListener('click', (e) => e.stopPropagation());
     };
-    [controls, boardShell, notationRow].forEach(stopPointer);
+    [boardShell, notationRow].forEach(stopPointer);
 
     const setEditMode = (on) => {
         state.editMode = on;
         root.classList.toggle('edit-mode', on);
-        editToggle.classList.toggle('active', on);
-        editToggle.setAttribute('aria-pressed', String(on));
+        syncRowsControls();
         updateFloatingControls();
         persistUiState();
+        return state.editMode;
     };
 
     const createCell = () => {
@@ -497,6 +484,7 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
         const current = context.state?.nodes?.get(node.id) ?? node;
         if (current?.settings) {
             current.settings[setting.settingKey] = notationText;
+            if (setting.settingKey === 'notes') current.settings.freq = notationText;
             if (setting.settingKey === 'notes') current.value = current.value ?? notationText;
             if (context.propagateValuesFrom) context.propagateValuesFrom(current.id);
             if (context.updateCodePanel) context.updateCodePanel();
@@ -647,10 +635,11 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
         });
     };
 
-    const applyParsedBoard = (columnsAst, skipNotationCommit = false) => {
+    const applyParsedBoard = (columnsAst, skipNotationCommit = false, options = {}) => {
         const required = Math.max(1, neededRows(columnsAst));
-        state.rows = required;
-        rowsInput.value = String(required);
+        const nextRows = options.preserveRows ? Math.max(state.rows, required) : required;
+        state.rows = nextRows;
+        persistUiState({ autoSave: false });
 
         board.innerHTML = '';
         createBoardBubble(board, 'start');
@@ -679,7 +668,7 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
 
     const parsedInitial = parseNotation(state.notation);
     if (parsedInitial.ok) {
-        applyParsedBoard(parsedInitial.columns, true);
+        applyParsedBoard(parsedInitial.columns, true, { preserveRows: true });
     } else {
         updateNotation();
     }
@@ -753,23 +742,35 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
 
     const setDisabled = (isDisabled) => {
         root.classList.toggle('notes-disabled', isDisabled);
-        [rowsInput, editToggle, notationInput, notationCopyInput].forEach((el) => {
+        [notationInput, notationCopyInput].forEach((el) => {
             el.disabled = isDisabled;
         });
         boardShell.style.pointerEvents = isDisabled ? 'none' : '';
+        syncRowsControls(isDisabled);
         updateFloatingControls();
     };
 
     setDisabled(connected);
 
     const api = {
+        setEditMode: (on) => setEditMode(Boolean(on)),
+        toggleEditMode: () => setEditMode(!state.editMode),
+        getEditMode: () => state.editMode,
+        setRows: (value) => {
+            const next = clampNumber(value, 1, 32, state.rows);
+            if (next === state.rows) return;
+            state.rows = next;
+            persistUiState({ autoSave: false });
+            applyRowChange();
+            setDisabled(connected);
+        },
         setNotation: (text) => {
             const parsed = parseNotation(text);
             if (!parsed.ok) return;
             state.notation = text;
             notationInput.value = text;
             notationCopyInput.value = text;
-            applyParsedBoard(parsed.columns, true);
+            applyParsedBoard(parsed.columns, true, { preserveRows: true });
             setDisabled(connected);
         },
         root
