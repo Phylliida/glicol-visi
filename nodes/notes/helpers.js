@@ -10,7 +10,7 @@ const alignOutputsToInputs = (nodeEl) => {
     const inputs = Array.from(nodeEl.querySelectorAll('.inputs .port-container'));
     const outputsRoot = nodeEl.querySelector('.outputs');
     const outputs = Array.from(outputsRoot?.querySelectorAll('.port-container') || []);
-    if (!outputsRoot || !inputs.length || inputs.length !== outputs.length) return;
+    if (!outputsRoot || !inputs.length || !outputs.length) return;
 
     const normalizeKey = (value) => String(value ?? '').trim().toLowerCase();
     const inputByKey = new Map();
@@ -27,6 +27,14 @@ const alignOutputsToInputs = (nodeEl) => {
         if (key && !outputByKey.has(key)) outputByKey.set(key, outRow);
     });
 
+    const notesInputRow = inputByKey.get('notes');
+    const freqInputRow = inputByKey.get('freq');
+    const freqInputHidden = freqInputRow
+        ? getComputedStyle(freqInputRow).display === 'none'
+        : true;
+    const outputsGapRaw = getComputedStyle(outputsRoot).rowGap || getComputedStyle(outputsRoot).gap || '0';
+    const outputsGap = parseFloat(outputsGapRaw);
+
     const orderedOutputs = [];
     inputs.forEach((inRow, idx) => {
         const key = normalizeKey(
@@ -35,6 +43,15 @@ const alignOutputsToInputs = (nodeEl) => {
         const outRow = outputByKey.get(key) ?? outputs[idx];
         if (outRow && !orderedOutputs.includes(outRow)) orderedOutputs.push(outRow);
     });
+    if (!inputByKey.has('freq')) {
+        const freqOutput = outputByKey.get('freq');
+        const notesOutput = outputByKey.get('notes');
+        if (freqOutput && !orderedOutputs.includes(freqOutput)) {
+            const notesIdx = notesOutput ? orderedOutputs.indexOf(notesOutput) : -1;
+            if (notesIdx >= 0) orderedOutputs.splice(notesIdx + 1, 0, freqOutput);
+            else orderedOutputs.push(freqOutput);
+        }
+    }
     outputs.forEach((outRow) => {
         if (!orderedOutputs.includes(outRow)) orderedOutputs.push(outRow);
     });
@@ -58,17 +75,36 @@ const alignOutputsToInputs = (nodeEl) => {
         return copyInput.offsetHeight + (Number.isFinite(gap) ? gap : 0);
     };
 
+    inputs.forEach((inRow) => {
+        clearLabelExtras(inRow);
+    });
+
     orderedOutputs.forEach((outRow, idx) => {
         clearLabelExtras(outRow);
         outRow.style.minHeight = '';
         outRow.style.alignItems = '';
+        outRow.style.marginTop = '';
+        outRow.style.position = '';
+        outRow.style.top = '';
         const key = normalizeKey(outRow.querySelector('.port-label')?.textContent);
-        const inRow = inputByKey.get(key) ?? inputs[idx];
-        clearLabelExtras(inRow);
+        const pinFreqToCopyLine = key === 'freq' && (freqInputHidden || !freqInputRow) && notesInputRow;
+        const inRow =
+            pinFreqToCopyLine
+                ? freqInputRow ?? inputs[idx]
+                : inputByKey.get(key) ?? inputs[idx];
         const height = inRow?.offsetHeight;
         if (height) {
             outRow.style.minHeight = `${height}px`;
-            outRow.style.alignItems = key === 'notes' ? 'flex-end' : 'center';
+            outRow.style.alignItems =
+                key === 'notes'
+                    ? 'flex-end'
+                    : 'center';
+        }
+        if (pinFreqToCopyLine) {
+            const rowHeight = outRow.offsetHeight;
+            const shift = rowHeight + (Number.isFinite(outputsGap) ? outputsGap : 0);
+            outRow.style.position = 'relative';
+            outRow.style.top = `-${shift}px`;
         }
         if (key === 'notes') {
             const copyOffset = getNotesCopyOffset(inRow);

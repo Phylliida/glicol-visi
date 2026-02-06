@@ -356,8 +356,14 @@ const moveRowsPortToTop = (nodeEl) => {
     }
 };
 
+const hideFreqInputPort = (nodeEl) => {
+    const freqPort = nodeEl?.querySelector('.inputs .port-container.setting-port[data-setting-key="freq"]');
+    if (freqPort) freqPort.style.display = 'none';
+};
+
 const afterRender = (node, nodeEl, context = {}) => {
     moveRowsPortToTop(nodeEl);
+    hideFreqInputPort(nodeEl);
     applyModeTonicVisibility(node.id, context);
 };
 
