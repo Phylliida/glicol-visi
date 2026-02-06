@@ -14,7 +14,7 @@ const alignOutputsToInputs = (nodeEl) => {
     outputs.forEach((outRow, idx) => {
         outRow.style.minHeight = '';
         const inRow = inputs[idx];
-        const height = inRow?.getBoundingClientRect().height;
+        const height = inRow?.offsetHeight;
         if (height) {
             outRow.style.minHeight = `${height}px`;
             outRow.style.alignItems = 'center';

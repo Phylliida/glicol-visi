@@ -707,15 +707,32 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
 
     const nodeObserver =
         typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => updateAutoSize()) : null;
+    const hasFixedNodeHeight = () => {
+        const current = context.state?.nodes?.get(node.id) ?? node;
+        return Number.isFinite(Number(current?.h));
+    };
+    const initializeNodeHeight = () => {
+        const current = context.state?.nodes?.get(node.id) ?? node;
+        if (!current || Number.isFinite(Number(current.h))) return;
+        const nodeEl = root.closest('.node');
+        if (!nodeEl) return;
+        const zoom = Math.max(0.001, Number(context?.state?.scale) || 1);
+        const measuredHeight = nodeEl.getBoundingClientRect().height / zoom;
+        if (!Number.isFinite(measuredHeight) || measuredHeight <= 0) return;
+        current.h = measuredHeight;
+        nodeEl.style.height = `${measuredHeight}px`;
+    };
     const observeNode = () => {
         if (!nodeObserver) return;
+        nodeObserver.disconnect();
         const nodeEl = root.closest('.node');
-        if (nodeEl) nodeObserver.observe(nodeEl);
+        if (nodeEl && hasFixedNodeHeight()) nodeObserver.observe(nodeEl);
     };
     observeNode();
 
     window.addEventListener('resize', updateAutoSize);
     requestAnimationFrame(() => {
+        initializeNodeHeight();
         observeNode();
         updateAutoSize();
     });
