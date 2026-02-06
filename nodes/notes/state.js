@@ -15,6 +15,9 @@ import {
     resolveTonicValue,
     clampNumber
 } from './constants.js';
+import { computeFrequencyNotation } from './freq-compute.js';
+
+const FREQ_INPUT_PORT_INDEX = 1;
 
 const getModeDegreeCount = (modeId, context = {}) => {
     const modeSets = TuningUtils.modeSetsCache;
@@ -44,13 +47,20 @@ const inferDefaultRows = (node, context = {}) => {
     return TONIC_OPTIONS.length || 12;
 };
 
-const getOutputValue = (node, portIndex) => {
+const getOutputValue = (node, portIndex, context = {}) => {
     if (!node) return undefined;
     if (portIndex === 0) return node.settings?.tuning ?? '';
     if (portIndex === 1) return node.settings?.mode ?? '';
     if (portIndex === 2) return node.settings?.tonic === '' ? '' : String(node.settings?.tonic ?? '');
     if (portIndex === 3) return node.settings?.notes ?? DEFAULT_NOTATION;
-    if (portIndex === 4) return node.settings?.freq ?? node.settings?.notes ?? DEFAULT_NOTATION;
+    if (portIndex === 4) {
+        const hasFreqIncoming =
+            typeof context?.hasIncomingConnection === 'function'
+                ? context.hasIncomingConnection(node.id, FREQ_INPUT_PORT_INDEX)
+                : false;
+        if (hasFreqIncoming) return String(node.settings?.freq ?? '');
+        return computeFrequencyNotation(node, context);
+    }
     if (portIndex === 5) {
         return clampNumber(
             node.settings?.rows ?? node.settings?.noteRows,

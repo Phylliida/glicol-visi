@@ -3,13 +3,31 @@ import { notesUiInstances } from './board-ui.js';
 import { updateTuningFields, updateModeFields, updateTonicField } from './mode-tonic.js';
 
 const updateSettingFieldDom = ({ node, nodeEl, settingKey, portIndex, value, context }) => {
+    const refreshFrequencyCopy = () => {
+        const instance = notesUiInstances.get(node.id);
+        if (instance && typeof instance.refreshFrequencyCopy === 'function') {
+            instance.refreshFrequencyCopy();
+        }
+    };
     const handled =
         settingKey === 'tuning'
-            ? (updateTuningFields(node.id, portIndex, value, context), true)
+            ? (() => {
+                updateTuningFields(node.id, portIndex, value, context);
+                refreshFrequencyCopy();
+                return true;
+            })()
             : settingKey === 'mode'
-                ? (updateModeFields(node.id, portIndex, value, context), true)
+                ? (() => {
+                    updateModeFields(node.id, portIndex, value, context);
+                    refreshFrequencyCopy();
+                    return true;
+                })()
                 : settingKey === 'tonic'
-                    ? (updateTonicField(node.id, portIndex, value, context), true)
+                    ? (() => {
+                        updateTonicField(node.id, portIndex, value, context);
+                        refreshFrequencyCopy();
+                        return true;
+                    })()
                     : settingKey === 'notes'
                         ? (() => {
                             const instance = notesUiInstances.get(node.id);

@@ -26,6 +26,13 @@ import { NOTES_CONFIG } from './config.js';
 const NOTES_EDIT_ICON_SVG =
     '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="currentColor" d="M5 19h1.425L16.2 9.225L14.775 7.8L5 17.575zm-1 2q-.425 0-.712-.288T3 20v-2.425q0-.4.15-.763t.425-.637L16.2 3.575q.3-.275.663-.425t.762-.15t.775.15t.65.45L20.425 5q.3.275.437.65T21 6.4q0 .4-.138.763t-.437.662l-12.6 12.6q-.275.275-.638.425t-.762.15zM19 6.4L17.6 5zm-3.525 2.125l-.7-.725L16.2 9.225z"/></svg>';
 
+const refreshFrequencyCopyForNode = (nodeId) => {
+    const instance = notesUiInstances.get(nodeId);
+    if (instance && typeof instance.refreshFrequencyCopy === 'function') {
+        instance.refreshFrequencyCopy();
+    }
+};
+
 const buildTuningField = ({ node, setting, portIndex, connected, context }) => {
     const settingKey = setting.settingKey ?? setting.key;
     const selectCat = document.createElement('select');
@@ -52,6 +59,7 @@ const buildTuningField = ({ node, setting, portIndex, connected, context }) => {
         getTuningMeta(val);
         if (context.propagateValuesFrom) context.propagateValuesFrom(current.id);
         refreshModeAndTonicForNode(current.id, context);
+        refreshFrequencyCopyForNode(current.id);
         if (context.updateCodePanel) context.updateCodePanel();
         if (context.autoSave) context.autoSave();
     };
@@ -199,6 +207,7 @@ const buildModeField = ({ node, setting, portIndex, connected, context }) => {
         if (!current) return;
         const val = selectMode.value;
         current.settings[settingKey] = val;
+        refreshFrequencyCopyForNode(current.id);
         if (context.updateCodePanel) context.updateCodePanel();
         if (context.propagateValuesFrom) context.propagateValuesFrom(current.id);
         if (context.autoSave) context.autoSave();
@@ -403,6 +412,7 @@ const buildTonicField = ({ node, setting, portIndex, connected, context }) => {
         const val = selectTonic.value === '' ? '' : clampTonicToCount(selectTonic.value, count);
         selectTonic.value = String(val);
         current.settings[settingKey] = val;
+        refreshFrequencyCopyForNode(current.id);
         if (context.updateCodePanel) context.updateCodePanel();
         if (context.propagateValuesFrom) context.propagateValuesFrom(current.id);
         if (context.autoSave) context.autoSave();

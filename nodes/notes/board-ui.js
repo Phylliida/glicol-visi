@@ -7,6 +7,7 @@ import {
     clampNumber
 } from './constants.js';
 import { alignOutputsToInputs } from './helpers.js';
+import { computeFrequencyNotation } from './freq-compute.js';
 
 const notesUiInstances = new Map();
 
@@ -187,9 +188,14 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
     const notationCopyInput = document.createElement('input');
     notationCopyInput.type = 'text';
     notationCopyInput.className = 'notes-notation-copy setting-field';
-    notationCopyInput.value = state.notation;
+    notationCopyInput.value = '';
     notationCopyInput.readOnly = true;
     notationCopyInput.tabIndex = -1;
+    const getCurrentNode = () => context.state?.nodes?.get(node.id) ?? node;
+    const refreshFrequencyCopy = () => {
+        const current = getCurrentNode();
+        notationCopyInput.value = computeFrequencyNotation(current, context);
+    };
     notationInput.addEventListener('mousedown', (e) => e.stopPropagation());
     notationInput.addEventListener('click', (e) => e.stopPropagation());
     notationInput.addEventListener('focus', () => {
@@ -200,13 +206,20 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
         updateNotation(true);
     });
     notationInput.addEventListener('input', () => {
-        notationCopyInput.value = notationInput.value;
         const parsed = parseNotation(notationInput.value);
         if (!parsed.ok) {
             notationInput.classList.add('invalid');
             return;
         }
         notationInput.classList.remove('invalid');
+        const current = getCurrentNode();
+        if (current?.settings) {
+            const previewNode = {
+                ...current,
+                settings: { ...current.settings, [setting.settingKey]: notationInput.value }
+            };
+            notationCopyInput.value = computeFrequencyNotation(previewNode, context);
+        }
         applyParsedBoard(parsed.columns, true, { preserveRows: true });
     });
     notationRow.append(notationInput, notationCopyInput);
@@ -479,13 +492,12 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
         const notationText = skipBoard ? notationInput.value : `<${cols.join(' ')}>`;
         notationInput.classList.remove('invalid');
         notationInput.value = notationText;
-        notationCopyInput.value = notationText;
         state.notation = notationText;
-        const current = context.state?.nodes?.get(node.id) ?? node;
+        const current = getCurrentNode();
         if (current?.settings) {
             current.settings[setting.settingKey] = notationText;
-            if (setting.settingKey === 'notes') current.settings.freq = notationText;
             if (setting.settingKey === 'notes') current.value = current.value ?? notationText;
+            refreshFrequencyCopy();
             if (context.propagateValuesFrom) context.propagateValuesFrom(current.id);
             if (context.updateCodePanel) context.updateCodePanel();
             if (context.autoSave) context.autoSave();
@@ -672,6 +684,7 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
     } else {
         updateNotation();
     }
+    refreshFrequencyCopy();
 
     const updateAutoSize = () => {
         const nodeEl = root.closest('.node');
@@ -769,9 +782,11 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
             if (!parsed.ok) return;
             state.notation = text;
             notationInput.value = text;
-            notationCopyInput.value = text;
             applyParsedBoard(parsed.columns, true, { preserveRows: true });
             setDisabled(connected);
+        },
+        refreshFrequencyCopy: () => {
+            refreshFrequencyCopy();
         },
         root
     };
