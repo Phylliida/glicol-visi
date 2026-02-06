@@ -408,38 +408,26 @@ const createNodeElement = (node) => {
         const el = e.currentTarget.closest('.node');
         if (!el) return;
 
-        const prevWidth = el.style.width;
-        const prevHeight = el.style.height;
-        const notesUiEls = Array.from(el.querySelectorAll('.notes-ui'));
-        const prevNotesColHeights = notesUiEls.map((ui) => ui.style.getPropertyValue('--notes-col-height'));
-        const notesShellEls = Array.from(el.querySelectorAll('.notes-board-shell'));
-        const prevNotesShellHeights = notesShellEls.map((shell) => shell.style.height);
         const minNotesColHeightPx = 10;
-
-        // Measure min node size using the notes column hard minimum, not the larger default/autosized value.
-        notesUiEls.forEach((ui) => ui.style.setProperty('--notes-col-height', `${minNotesColHeightPx}px`));
-        notesShellEls.forEach((shell) => {
-            shell.style.height = '';
-        });
-        el.style.width = '';
-        el.style.height = '';
-        const naturalRect = el.getBoundingClientRect();
-        notesUiEls.forEach((ui, idx) => {
-            const value = prevNotesColHeights[idx];
-            if (value) ui.style.setProperty('--notes-col-height', value);
-            else ui.style.removeProperty('--notes-col-height');
-        });
-        notesShellEls.forEach((shell, idx) => {
-            shell.style.height = prevNotesShellHeights[idx];
-        });
-        el.style.width = prevWidth;
-        el.style.height = prevHeight;
-
+        const defaultMinNodeHeightPx = 56;
         const rect = el.getBoundingClientRect();
         const startWidth = rect.width / state.scale;
         const startHeight = rect.height / state.scale;
-        const minWidth = Math.min(naturalRect.width / state.scale, startWidth);
-        const minHeight = Math.min(naturalRect.height / state.scale, startHeight);
+        const cssMinWidth = parseFloat(getComputedStyle(el).minWidth || '150') || 150;
+        let minWidth = Math.min(startWidth, cssMinWidth);
+        let minHeight = 0;
+        const notesUi = el.querySelector('.notes-ui');
+        if (notesUi) {
+            const currentNotesColHeight =
+                parseFloat(getComputedStyle(notesUi).getPropertyValue('--notes-col-height')) || minNotesColHeightPx;
+            const notesHeightDelta = Math.max(0, currentNotesColHeight - minNotesColHeightPx);
+            minHeight = Math.max(0, startHeight - notesHeightDelta);
+        } else {
+            const cssMinHeight = parseFloat(getComputedStyle(el).minHeight || '0') || 0;
+            minHeight = Math.max(defaultMinNodeHeightPx, cssMinHeight);
+        }
+        minWidth = Math.min(minWidth, startWidth);
+        minHeight = Math.min(minHeight, startHeight);
         state.nodeResizing = {
             nodeId: node.id,
             startX: e.clientX,
