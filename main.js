@@ -1038,6 +1038,9 @@ const init = async () => {
         button.addEventListener('click', () => {
             const id = generateId('node');
             const nodeData = { id, type: button.dataset.type, x: 100, y: 100 };
+            if (nodeData.type === 'notes') {
+                nodeData.settings = { noteEditMode: true };
+            }
             ensureNodeSettings(nodeData);
             state.nodes.set(id, nodeData);
             render();

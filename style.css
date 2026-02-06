@@ -121,6 +121,7 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
+    overflow: visible;
 }
 
 #connections-layer > * {
@@ -435,7 +436,9 @@ body {
 }
 
 .outputs .port-container {
-    flex-direction: row-reverse;
+    flex-direction: row;
+    justify-content: flex-end;
+    width: 100%;
 }
 
 .setting-field {
@@ -540,7 +543,7 @@ g:hover .connection {
     --notes-edit-right-offset: 0px;
 }
 .port-container.setting-port[data-setting-key="notes"] {
-    align-items: stretch;
+    align-items: flex-end;
 }
 .port-container.setting-port[data-setting-key="notes"] .notes-ui {
     height: 100%;
@@ -560,6 +563,10 @@ g:hover .connection {
 }
 .notes-controls input {
     min-width: 0;
+}
+.notes-controls .notes-edit-toggle {
+    margin-left: auto;
+    align-self: flex-start;
 }
 .notes-board-shell {
     width: 100%;
@@ -706,11 +713,21 @@ g:hover .connection {
 .notes-edit-toggle {
     width: 28px;
     height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    line-height: 1;
     border-radius: 50%;
     border: 1px solid #555;
     background: #222;
     color: #eee;
     box-shadow: 0 0 0 1px #111;
+}
+.notes-edit-toggle svg {
+    display: block;
+    width: 70%;
+    height: 70%;
 }
 .notes-edit-toggle.active {
     border-color: #4a9eff;
@@ -753,6 +770,11 @@ g:hover .connection {
     background: #b91c1c;
     border-color: #b91c1c;
     color: #fff;
+}
+.notes-remove-btn svg {
+    display: block;
+    width: 9px;
+    height: 9px;
 }
 .notes-split-btn {
     display: none;
@@ -803,12 +825,14 @@ g:hover .connection {
 }
 .notes-notation-row {
     display: flex;
-    gap: 0.5rem;
-    align-items: center;
+    flex-direction: column;
+    gap: 0.35rem;
+    align-items: stretch;
     font-size: 0.8rem;
 }
 .notes-notation-row input {
     flex: 1;
+    width: 100%;
 }
 .notes-notation.invalid {
     border-color: #ef4444;

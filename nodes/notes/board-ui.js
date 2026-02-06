@@ -6,6 +6,7 @@ import {
     BUBBLE_SHIFT_UNIT,
     clampNumber
 } from './constants.js';
+import { alignOutputsToInputs } from './helpers.js';
 
 const notesUiInstances = new Map();
 
@@ -57,6 +58,10 @@ const FLOAT_ZOOM_THRESHOLD = 1.8;
 const FLOAT_TOP_MARGIN = 10;
 const FLOAT_BOTTOM_MARGIN = 10;
 const FLOAT_RIGHT_MARGIN = 10;
+const NOTES_EDIT_ICON_SVG =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="currentColor" d="M5 19h1.425L16.2 9.225L14.775 7.8L5 17.575zm-1 2q-.425 0-.712-.288T3 20v-2.425q0-.4.15-.763t.425-.637L16.2 3.575q.3-.275.663-.425t.762-.15t.775.15t.65.45L20.425 5q.3.275.437.65T21 6.4q0 .4-.138.763t-.437.662l-12.6 12.6q-.275.275-.638.425t-.762.15zM19 6.4L17.6 5zm-3.525 2.125l-.7-.725L16.2 9.225z"/></svg>';
+const NOTES_REMOVE_ICON_SVG =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2.25" d="M6 12h12"/></svg>';
 
 const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
     const settings = node.settings ?? {};
@@ -112,7 +117,8 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
     const editToggle = document.createElement('button');
     editToggle.type = 'button';
     editToggle.className = 'notes-edit-toggle';
-    editToggle.textContent = 'E';
+    editToggle.innerHTML = NOTES_EDIT_ICON_SVG;
+    editToggle.setAttribute('aria-label', 'Toggle notes edit mode');
     editToggle.setAttribute('aria-pressed', String(state.editMode));
     editToggle.addEventListener('mousedown', (e) => e.stopPropagation());
     editToggle.addEventListener('click', (e) => {
@@ -187,12 +193,16 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
 
     const notationRow = document.createElement('div');
     notationRow.className = 'notes-notation-row';
-    const notationLabel = document.createElement('span');
-    notationLabel.textContent = 'Strudel notation';
     const notationInput = document.createElement('input');
     notationInput.type = 'text';
-    notationInput.className = 'notes-notation';
+    notationInput.className = 'notes-notation setting-field';
     notationInput.value = state.notation;
+    const notationCopyInput = document.createElement('input');
+    notationCopyInput.type = 'text';
+    notationCopyInput.className = 'notes-notation-copy setting-field';
+    notationCopyInput.value = state.notation;
+    notationCopyInput.readOnly = true;
+    notationCopyInput.tabIndex = -1;
     notationInput.addEventListener('mousedown', (e) => e.stopPropagation());
     notationInput.addEventListener('click', (e) => e.stopPropagation());
     notationInput.addEventListener('focus', () => {
@@ -203,6 +213,7 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
         updateNotation(true);
     });
     notationInput.addEventListener('input', () => {
+        notationCopyInput.value = notationInput.value;
         const parsed = parseNotation(notationInput.value);
         if (!parsed.ok) {
             notationInput.classList.add('invalid');
@@ -211,7 +222,7 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
         notationInput.classList.remove('invalid');
         applyParsedBoard(parsed.columns, true);
     });
-    notationRow.append(notationLabel, notationInput);
+    notationRow.append(notationInput, notationCopyInput);
 
     root.append(controls, boardShell, notationRow);
 
@@ -301,7 +312,8 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
         const removeBtn = document.createElement('button');
         removeBtn.type = 'button';
         removeBtn.className = 'notes-remove-btn';
-        removeBtn.textContent = '-';
+        removeBtn.innerHTML = NOTES_REMOVE_ICON_SVG;
+        removeBtn.setAttribute('aria-label', 'Remove column');
         removeBtn.title = 'Remove column';
         removeBtn.addEventListener('click', (ev) => {
             ev.stopPropagation();
@@ -480,6 +492,7 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
         const notationText = skipBoard ? notationInput.value : `<${cols.join(' ')}>`;
         notationInput.classList.remove('invalid');
         notationInput.value = notationText;
+        notationCopyInput.value = notationText;
         state.notation = notationText;
         const current = context.state?.nodes?.get(node.id) ?? node;
         if (current?.settings) {
@@ -703,6 +716,7 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
         boardShell.style.maxWidth = '100%';
         alignEndBubble(board);
         updateFloatingControls();
+        alignOutputsToInputs(nodeEl);
     };
 
     const nodeObserver =
@@ -739,7 +753,7 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
 
     const setDisabled = (isDisabled) => {
         root.classList.toggle('notes-disabled', isDisabled);
-        [rowsInput, editToggle, notationInput].forEach((el) => {
+        [rowsInput, editToggle, notationInput, notationCopyInput].forEach((el) => {
             el.disabled = isDisabled;
         });
         boardShell.style.pointerEvents = isDisabled ? 'none' : '';
@@ -754,6 +768,7 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
             if (!parsed.ok) return;
             state.notation = text;
             notationInput.value = text;
+            notationCopyInput.value = text;
             applyParsedBoard(parsed.columns, true);
             setDisabled(connected);
         },
