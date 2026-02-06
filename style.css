@@ -533,6 +533,11 @@ g:hover .connection {
     --notes-btn-scale: 1;
     --notes-canvas-zoom: 1;
     --notes-grid-line-width: 1px;
+    --notes-float-top-offset: 0px;
+    --notes-float-bottom-offset: 0px;
+    --notes-float-center-offset: 0px;
+    --notes-edit-top-offset: 0px;
+    --notes-edit-right-offset: 0px;
 }
 .port-container.setting-port[data-setting-key="notes"] {
     align-items: stretch;
@@ -711,6 +716,21 @@ g:hover .connection {
     border-color: #4a9eff;
     box-shadow: 0 0 0 1px #1f2f4a, 0 0 0 3px rgba(74, 158, 255, 0.2);
 }
+.notes-ui.notes-floating-controls .notes-controls {
+    position: relative;
+}
+.notes-ui.notes-floating-controls .notes-edit-toggle {
+    position: absolute;
+    top: var(--notes-edit-top-offset);
+    right: var(--notes-edit-right-offset);
+    width: 14px;
+    height: 14px;
+    font-size: 11px;
+    line-height: 1;
+    transform: scale(var(--notes-btn-scale));
+    transform-origin: top right;
+    z-index: 16;
+}
 .notes-remove-btn {
     display: none;
     width: 14px;
@@ -771,6 +791,15 @@ g:hover .connection {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+}
+.notes-ui.notes-floating-controls .notes-col-header {
+    top: var(--notes-float-top-offset);
+}
+.notes-ui.notes-floating-controls .notes-bubble {
+    top: calc(50% + var(--notes-float-center-offset) + var(--bubble-shift, 0px));
+}
+.notes-ui.notes-floating-controls .notes-split-btn {
+    bottom: var(--notes-float-bottom-offset);
 }
 .notes-notation-row {
     display: flex;

@@ -52,6 +52,11 @@ const alignEndBubble = (boardEl) => {
 const isDigit = (ch) => ch >= '0' && ch <= '9';
 const MIN_NOTE_COL_HEIGHT = 10;
 const BUTTON_SIZE_MULTIPLIER = 1.35;
+const MAX_BUTTON_GROWTH_FACTOR = 2;
+const FLOAT_ZOOM_THRESHOLD = 1.8;
+const FLOAT_TOP_MARGIN = 10;
+const FLOAT_BOTTOM_MARGIN = 10;
+const FLOAT_RIGHT_MARGIN = 10;
 
 const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
     const settings = node.settings ?? {};
@@ -123,14 +128,55 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
     board.className = 'notes-board';
     boardShell.appendChild(board);
 
+    const clearFloatingOffsets = () => {
+        root.style.removeProperty('--notes-float-top-offset');
+        root.style.removeProperty('--notes-float-bottom-offset');
+        root.style.removeProperty('--notes-float-center-offset');
+        root.style.removeProperty('--notes-edit-top-offset');
+        root.style.removeProperty('--notes-edit-right-offset');
+    };
+
+    const updateFloatingControls = () => {
+        if (!root.isConnected) return;
+        const zoom = Math.max(0.001, Number(context?.state?.scale) || 1);
+        const canvasRect = document.getElementById('canvas-container')?.getBoundingClientRect();
+        const topLimit = (canvasRect?.top ?? 0) + FLOAT_TOP_MARGIN;
+        const bottomLimit = (canvasRect?.bottom ?? window.innerHeight) - FLOAT_BOTTOM_MARGIN;
+        const rightLimit = (canvasRect?.right ?? window.innerWidth) - FLOAT_RIGHT_MARGIN;
+        const boardRect = boardShell.getBoundingClientRect();
+        const rootRect = root.getBoundingClientRect();
+        const visibleCenter = (topLimit + bottomLimit) / 2;
+        const boardCenter = boardRect.top + boardRect.height / 2;
+        const topOverflow = topLimit - boardRect.top;
+        const bottomOverflow = boardRect.bottom - bottomLimit;
+        const shouldFloat =
+            !connected && zoom >= FLOAT_ZOOM_THRESHOLD && (topOverflow > 0 || bottomOverflow > 0);
+
+        root.classList.toggle('notes-floating-controls', shouldFloat);
+        if (!shouldFloat) {
+            clearFloatingOffsets();
+            return;
+        }
+
+        root.style.setProperty('--notes-float-top-offset', `${Math.max(0, topOverflow) / zoom}px`);
+        root.style.setProperty('--notes-float-bottom-offset', `${Math.max(0, bottomOverflow) / zoom}px`);
+        root.style.setProperty('--notes-float-center-offset', `${(visibleCenter - boardCenter) / zoom}px`);
+        root.style.setProperty('--notes-edit-top-offset', `${Math.max(0, topLimit - rootRect.top) / zoom}px`);
+        root.style.setProperty(
+            '--notes-edit-right-offset',
+            `${(rootRect.right - rightLimit) / zoom}px`
+        );
+    };
+
     const applyZoomButtonScale = () => {
         const zoom = Math.max(0.001, Number(context?.state?.scale) || 1);
-        const next = BUTTON_SIZE_MULTIPLIER / zoom;
+        const next = Math.min(BUTTON_SIZE_MULTIPLIER / zoom, BUTTON_SIZE_MULTIPLIER * MAX_BUTTON_GROWTH_FACTOR);
         state.buttonScale = next;
         root.style.setProperty('--notes-btn-scale', `${next}`);
         root.style.setProperty('--notes-canvas-zoom', `${zoom}`);
         root.style.setProperty('--notes-grid-line-width', `${1 / zoom}px`);
         syncBubbleShifts(board, board, next);
+        updateFloatingControls();
     };
 
     const applyNotesHeights = (colHeight, shellHeight = null) => {
@@ -180,6 +226,7 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
         root.classList.toggle('edit-mode', on);
         editToggle.classList.toggle('active', on);
         editToggle.setAttribute('aria-pressed', String(on));
+        updateFloatingControls();
         persistUiState();
     };
 
@@ -655,6 +702,7 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
         applyNotesHeights(colHeight, available);
         boardShell.style.maxWidth = '100%';
         alignEndBubble(board);
+        updateFloatingControls();
     };
 
     const nodeObserver =
@@ -678,6 +726,7 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
             el.disabled = isDisabled;
         });
         boardShell.style.pointerEvents = isDisabled ? 'none' : '';
+        updateFloatingControls();
     };
 
     setDisabled(connected);
