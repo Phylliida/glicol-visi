@@ -21,6 +21,7 @@ import {
     unwrapNotesExpression,
     unwrapFreqExpression
 } from './nodes/notes/freq-compute.js';
+import { notesUiInstances } from './nodes/notes/board-ui.js';
 
 // ============================================================================
 // UTILITIES
@@ -56,7 +57,9 @@ const state = {
     tempConnectionEnd: null,
     resizing: null,
     nodeResizing: null,
-    autoUpdateOnEdit: true
+    autoUpdateOnEdit: true,
+    notesPlaybackSegments: [],
+    notesPlaybackHook: null
 };
 
 const screenToWorld = (clientX, clientY) => {
@@ -577,6 +580,177 @@ const buildComponentMap = () => {
     return compMap;
 };
 
+const extractNotationPayload = (expression) => {
+    const text = String(expression ?? '');
+    const openParen = text.indexOf('(');
+    if (openParen < 0) return null;
+    const quote = text[openParen + 1];
+    if (quote !== '"' && quote !== "'") return null;
+    const close = text.lastIndexOf(quote);
+    if (close <= openParen + 1 || text[text.length - 1] !== ')' || close !== text.length - 2) {
+        return null;
+    }
+    return {
+        notation: text.slice(openParen + 2, close),
+        notationOffset: openParen + 2
+    };
+};
+
+const getTopLevelColumnRanges = (notation, absoluteStart) => {
+    const ranges = [];
+    if (!notation) return ranges;
+    const open = notation.indexOf('<');
+    if (open < 0) return ranges;
+
+    let curlyDepth = 0;
+    let squareDepth = 0;
+    let columnStart = -1;
+
+    for (let i = open + 1; i < notation.length; i += 1) {
+        const ch = notation[i];
+        const atTop = curlyDepth === 0 && squareDepth === 0;
+
+        if (atTop && ch === '>') {
+            if (columnStart >= 0 && i > columnStart) {
+                ranges.push({
+                    index: ranges.length,
+                    start: absoluteStart + columnStart,
+                    end: absoluteStart + i
+                });
+            }
+            break;
+        }
+
+        if (atTop && /\s/.test(ch)) {
+            if (columnStart >= 0 && i > columnStart) {
+                ranges.push({
+                    index: ranges.length,
+                    start: absoluteStart + columnStart,
+                    end: absoluteStart + i
+                });
+                columnStart = -1;
+            }
+            continue;
+        }
+
+        if (columnStart < 0) {
+            columnStart = i;
+        }
+
+        if (ch === '{') curlyDepth += 1;
+        else if (ch === '}' && curlyDepth > 0) curlyDepth -= 1;
+        else if (ch === '[') squareDepth += 1;
+        else if (ch === ']' && squareDepth > 0) squareDepth -= 1;
+    }
+
+    return ranges;
+};
+
+const getLocationBounds = (location) => {
+    let start;
+    let end;
+    if (Array.isArray(location)) {
+        [start, end] = location;
+    } else if (location && typeof location === 'object') {
+        start = location.start ?? location.from;
+        end = location.end ?? location.to;
+    }
+    start = Number(start);
+    end = Number(end);
+    if (!Number.isFinite(start)) return null;
+    if (!Number.isFinite(end)) end = start + 1;
+    if (end < start) [start, end] = [end, start];
+    if (end === start) end = start + 1;
+    return { start, end };
+};
+
+const clearNotesPlaybackHighlights = () => {
+    for (const instance of notesUiInstances.values()) {
+        if (typeof instance?.clearPlayingColumns === 'function') {
+            instance.clearPlayingColumns();
+        } else {
+            const root = instance?.root;
+            if (!root) continue;
+            root.querySelectorAll(':scope > .notes-board-shell > .notes-board > .notes-col').forEach((col) => {
+                col.classList.remove('playing');
+            });
+        }
+    }
+};
+
+const applyNotesPlaybackHighlights = (activeColumnsByNode) => {
+    const emptySet = new Set();
+    for (const [nodeId, instance] of notesUiInstances.entries()) {
+        const active = activeColumnsByNode.get(nodeId) ?? emptySet;
+        if (typeof instance?.setPlayingColumns === 'function') {
+            instance.setPlayingColumns(active);
+            continue;
+        }
+        const root = instance?.root;
+        if (!root || !root.isConnected) continue;
+        root.querySelectorAll(':scope > .notes-board-shell > .notes-board > .notes-col').forEach((col, index) => {
+            col.classList.toggle('playing', active.has(index));
+        });
+    }
+};
+
+const collectActiveNotesColumns = (haps) => {
+    const activeColumnsByNode = new Map();
+    const segments = state.notesPlaybackSegments;
+    if (!Array.isArray(segments) || segments.length === 0) return activeColumnsByNode;
+
+    for (const hap of Array.isArray(haps) ? haps : []) {
+        const locations = hap?.context?.locations;
+        if (!Array.isArray(locations) || locations.length === 0) continue;
+        for (const location of locations) {
+            const bounds = getLocationBounds(location);
+            if (!bounds) continue;
+            for (const segment of segments) {
+                if (bounds.end <= segment.notationStart || bounds.start >= segment.notationEnd) {
+                    continue;
+                }
+                for (const column of segment.columns) {
+                    if (bounds.end <= column.start || bounds.start >= column.end) {
+                        continue;
+                    }
+                    let activeForNode = activeColumnsByNode.get(segment.nodeId);
+                    if (!activeForNode) {
+                        activeForNode = new Set();
+                        activeColumnsByNode.set(segment.nodeId, activeForNode);
+                    }
+                    activeForNode.add(column.index);
+                }
+            }
+        }
+    }
+
+    return activeColumnsByNode;
+};
+
+const installNotesPlaybackHook = () => {
+    const repl = getStrudelRepl();
+    if (!repl || typeof repl.highlight !== 'function') {
+        return false;
+    }
+    if (state.notesPlaybackHook?.repl === repl) {
+        return true;
+    }
+
+    if (state.notesPlaybackHook?.repl && typeof state.notesPlaybackHook.originalHighlight === 'function') {
+        state.notesPlaybackHook.repl.highlight = state.notesPlaybackHook.originalHighlight;
+    }
+
+    const originalHighlight = repl.highlight.bind(repl);
+    repl.highlight = (haps, time) => {
+        originalHighlight(haps, time);
+        const activeColumnsByNode = collectActiveNotesColumns(haps);
+        applyNotesPlaybackHighlights(activeColumnsByNode);
+    };
+
+    state.notesPlaybackHook = { repl, originalHighlight };
+    return true;
+};
+
 const updateCodePanel = () => {
     const strudelEditor = document.querySelector('strudel-editor');
     if (!strudelEditor) return;
@@ -633,8 +807,7 @@ const updateCodePanel = () => {
 
     const componentOrder = new Map(orderedComponents.map(([id], index) => [id, index]));
 
-    const codeText = codeNodes
-        .sort((a, b) => {
+    const orderedCodeNodes = codeNodes.sort((a, b) => {
             const compA = componentMap.get(a.id) ?? a.id;
             const compB = componentMap.get(b.id) ?? b.id;
             if (compA !== compB) {
@@ -647,9 +820,35 @@ const updateCodePanel = () => {
             const xDiff = (a.x ?? 0) - (b.x ?? 0);
             if (xDiff !== 0) return xDiff;
             return parseIdNumber(a.id) - parseIdNumber(b.id);
-        })
-        .map(getNodeCodeText)
-        .join('\n');
+        });
+
+    const notesPlaybackSegments = [];
+    const codeLines = [];
+    let lineStart = 0;
+    orderedCodeNodes.forEach((node, index) => {
+        const line = getNodeCodeText(node);
+        codeLines.push(line);
+        if (node.type === 'notes') {
+            const payload = extractNotationPayload(line);
+            if (payload) {
+                const notationStart = lineStart + payload.notationOffset;
+                const notationEnd = notationStart + payload.notation.length;
+                const columns = getTopLevelColumnRanges(payload.notation, notationStart);
+                notesPlaybackSegments.push({
+                    nodeId: node.id,
+                    notationStart,
+                    notationEnd,
+                    columns
+                });
+            }
+        }
+        lineStart += line.length;
+        if (index < orderedCodeNodes.length - 1) {
+            lineStart += 1;
+        }
+    });
+    const codeText = codeLines.join('\n');
+    state.notesPlaybackSegments = notesPlaybackSegments;
 
     let codeChanged = false;
     if (strudelEditor.getAttribute('code') !== codeText) {
@@ -658,6 +857,11 @@ const updateCodePanel = () => {
     }
     if (codeChanged) {
         queueMicrotask(() => requestAutoUpdate());
+    }
+
+    installNotesPlaybackHook();
+    if (!notesPlaybackSegments.length) {
+        clearNotesPlaybackHighlights();
     }
 
     // The strudel component renders into a sibling container; ensure it fills the panel.
@@ -684,6 +888,7 @@ const tryAsyncMethod = async (target, methodName, ...args) => {
 };
 
 const runUpdateAction = async () => {
+    installNotesPlaybackHook();
     const repl = getStrudelRepl();
     if (!repl) return;
     await repl.evaluate(false);
@@ -691,6 +896,7 @@ const runUpdateAction = async () => {
 
 const runStopAction = async () => {
     pendingAutoUpdate = false;
+    clearNotesPlaybackHighlights();
     const repl = getStrudelRepl();
     if (await tryAsyncMethod(repl, 'stop')) return;
     if (await tryAsyncMethod(repl, 'pause')) return;
@@ -1180,6 +1386,16 @@ const init = async () => {
         });
     }
 
+    const strudelEditorEl = document.querySelector('strudel-editor');
+    if (strudelEditorEl) {
+        strudelEditorEl.addEventListener('update', (event) => {
+            if (event?.detail?.started === false) {
+                clearNotesPlaybackHighlights();
+            }
+            installNotesPlaybackHook();
+        });
+    }
+
     initNodeTypes(getNodeContext());
 
     // Toolbar: Add node buttons
@@ -1211,6 +1427,7 @@ const init = async () => {
 
     // Code panel: Play/Update buttons
     document.getElementById('play-btn').addEventListener('click', async () => {
+        installNotesPlaybackHook();
         const repl = getStrudelRepl();
         if (!repl) return;
         await repl.evaluate(true);

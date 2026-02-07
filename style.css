@@ -666,6 +666,25 @@ g:hover .connection {
     flex: 1 1 auto;
     min-width: 0;
 }
+.notes-playback-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2;
+    overflow: hidden;
+}
+.notes-playback-box {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    opacity: 0;
+    border: 1px solid rgba(147, 197, 253, 0.75);
+    background: rgba(37, 99, 235, 0.16);
+    will-change: left, width, opacity;
+}
+.notes-playback-box.active {
+    opacity: 1;
+}
 .notes-col {
     position: relative;
     display: flex;

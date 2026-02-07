@@ -83,6 +83,38 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
         editMode: settings.noteEditMode !== false,
         notation: settings.notes ?? DEFAULT_NOTATION
     };
+    let playingColumns = new Set();
+    let lastTopLevelColumnCount = 0;
+    let overlayLayoutDirty = true;
+    let overlayBoxes = [];
+
+    const setsEqual = (a, b) => {
+        if (a === b) return true;
+        if (!a || !b) return false;
+        if (a.size !== b.size) return false;
+        for (const value of a) {
+            if (!b.has(value)) return false;
+        }
+        return true;
+    };
+
+    const normalizeColumnSet = (source) => {
+        if (source instanceof Set) {
+            return new Set(
+                Array.from(source)
+                    .map((v) => Number(v))
+                    .filter((v) => Number.isInteger(v) && v >= 0)
+            );
+        }
+        if (Array.isArray(source)) {
+            return new Set(
+                source
+                    .map((v) => Number(v))
+                    .filter((v) => Number.isInteger(v) && v >= 0)
+            );
+        }
+        return new Set();
+    };
 
     const syncRowsControls = (isDisabled = connected) => {
         const nodeEl = root.closest('.node');
@@ -125,7 +157,75 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
 
     const board = document.createElement('div');
     board.className = 'notes-board';
-    boardShell.appendChild(board);
+    const playbackOverlay = document.createElement('div');
+    playbackOverlay.className = 'notes-playback-overlay';
+    boardShell.append(board, playbackOverlay);
+
+    const topLevelColumns = () => Array.from(board.querySelectorAll(':scope > .notes-col'));
+    const createOverlayBox = () => {
+        const box = document.createElement('div');
+        box.className = 'notes-playback-box';
+        return box;
+    };
+    const ensureOverlayBoxCount = (count) => {
+        while (overlayBoxes.length > count) {
+            const box = overlayBoxes.pop();
+            box.remove();
+        }
+        while (overlayBoxes.length < count) {
+            const box = createOverlayBox();
+            overlayBoxes.push(box);
+            playbackOverlay.appendChild(box);
+        }
+    };
+    const syncPlaybackOverlay = ({ forceLayout = false } = {}) => {
+        const cols = topLevelColumns();
+        const countChanged = cols.length !== overlayBoxes.length;
+        if (countChanged) {
+            ensureOverlayBoxCount(cols.length);
+            forceLayout = true;
+        }
+        if (forceLayout || overlayLayoutDirty) {
+            const scrollLeft = boardShell.scrollLeft;
+            cols.forEach((col, index) => {
+                const box = overlayBoxes[index];
+                const left = col.offsetLeft - scrollLeft;
+                const width = col.offsetWidth;
+                if (box.dataset.left !== String(left)) {
+                    box.style.left = `${left}px`;
+                    box.dataset.left = String(left);
+                }
+                if (box.dataset.width !== String(width)) {
+                    box.style.width = `${width}px`;
+                    box.dataset.width = String(width);
+                }
+            });
+            overlayLayoutDirty = false;
+        }
+        return cols.length;
+    };
+    let overlaySyncRaf = 0;
+    const requestOverlayLayoutSync = () => {
+        overlayLayoutDirty = true;
+        if (overlaySyncRaf) return;
+        overlaySyncRaf = requestAnimationFrame(() => {
+            overlaySyncRaf = 0;
+            syncPlaybackOverlay({ forceLayout: true });
+        });
+    };
+    const applyPlayingColumns = (source, { force = false } = {}) => {
+        const next = normalizeColumnSet(source);
+        const topLevelCount = syncPlaybackOverlay({ forceLayout: force });
+        if (!force && setsEqual(playingColumns, next) && topLevelCount === lastTopLevelColumnCount) {
+            return;
+        }
+        overlayBoxes.forEach((box, index) => {
+            box.classList.toggle('active', next.has(index));
+        });
+        playingColumns = next;
+        lastTopLevelColumnCount = topLevelCount;
+    };
+    boardShell.addEventListener('scroll', requestOverlayLayoutSync, { passive: true });
 
     const clearFloatingOffsets = () => {
         root.style.removeProperty('--notes-float-top-offset');
@@ -175,6 +275,7 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
         root.style.setProperty('--notes-canvas-zoom', `${zoom}`);
         root.style.setProperty('--notes-grid-line-width', `${1 / zoom}px`);
         syncBubbleShifts(board, board, next);
+        requestOverlayLayoutSync();
         updateFloatingControls();
     };
 
@@ -481,6 +582,7 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
         Array.from(targetBoard.querySelectorAll(':scope > .notes-col')).forEach((col) => ensureRows(col));
         setBubbleShift(targetBoard);
         alignEndBubble(targetBoard);
+        requestOverlayLayoutSync();
         updateNotation();
     };
 
@@ -703,6 +805,8 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
             applyColumnState(colEl, colAst);
         });
 
+        overlayLayoutDirty = true;
+        applyPlayingColumns(playingColumns, { force: true });
         refreshHeaders(board);
         if (!skipNotationCommit) updateNotation(true);
     };
@@ -756,6 +860,7 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
         applyNotesHeights(colHeight, available);
         boardShell.style.maxWidth = '100%';
         alignEndBubble(board);
+        requestOverlayLayoutSync();
         updateFloatingControls();
         alignOutputsToInputs(nodeEl);
         if (context.renderConnections) context.renderConnections();
@@ -828,6 +933,12 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
         },
         refreshFrequencyCopy: () => {
             refreshFrequencyCopy();
+        },
+        setPlayingColumns: (indices) => {
+            applyPlayingColumns(indices);
+        },
+        clearPlayingColumns: () => {
+            applyPlayingColumns(new Set(), { force: true });
         },
         root
     };
