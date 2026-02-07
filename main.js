@@ -673,10 +673,57 @@ const getStrudelRepl = () => document.querySelector('strudel-editor')?.editor;
 let updateEvaluateInFlight = false;
 let pendingAutoUpdate = false;
 
+const tryAsyncMethod = async (target, methodName, ...args) => {
+    if (!target || typeof target[methodName] !== 'function') return false;
+    try {
+        await target[methodName](...args);
+        return true;
+    } catch {
+        return false;
+    }
+};
+
 const runUpdateAction = async () => {
     const repl = getStrudelRepl();
     if (!repl) return;
     await repl.evaluate(false);
+};
+
+const runStopAction = async () => {
+    pendingAutoUpdate = false;
+    const repl = getStrudelRepl();
+    if (await tryAsyncMethod(repl, 'stop')) return;
+    if (await tryAsyncMethod(repl, 'pause')) return;
+    if (await tryAsyncMethod(repl, 'hush')) return;
+    if (typeof window.hush === 'function') {
+        try {
+            window.hush();
+            return;
+        } catch {
+            // Continue to shortcut fallback.
+        }
+    }
+
+    const target = document.querySelector('#code-panel .cm-content, #code-panel #code, #code-panel');
+    if (!target) return;
+    target.dispatchEvent(
+        new KeyboardEvent('keydown', {
+            key: '.',
+            code: 'Period',
+            ctrlKey: true,
+            bubbles: true,
+            cancelable: true
+        })
+    );
+    target.dispatchEvent(
+        new KeyboardEvent('keydown', {
+            key: '.',
+            code: 'Period',
+            altKey: true,
+            bubbles: true,
+            cancelable: true
+        })
+    );
 };
 
 const runAutoUpdate = async () => {
@@ -1167,6 +1214,10 @@ const init = async () => {
         const repl = getStrudelRepl();
         if (!repl) return;
         await repl.evaluate(true);
+    });
+
+    document.getElementById('stop-btn').addEventListener('click', async () => {
+        await runStopAction();
     });
 
     document.getElementById('update-btn').addEventListener('click', async () => {
