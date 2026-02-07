@@ -1,4 +1,11 @@
-import { DEFAULT_NOTATION, DEFAULT_NOTE_ROWS, clampNumber } from './constants.js';
+import {
+    DEFAULT_NOTATION,
+    DEFAULT_NOTE_ROWS,
+    DEFAULT_OCTAVE_SHIFT,
+    OCTAVE_SHIFT_MIN,
+    OCTAVE_SHIFT_MAX,
+    clampNumber
+} from './constants.js';
 import { notesUiInstances } from './board-ui.js';
 import { updateTuningFields, updateModeFields, updateTonicField } from './mode-tonic.js';
 
@@ -53,6 +60,24 @@ const updateSettingFieldDom = ({ node, nodeEl, settingKey, portIndex, value, con
                                 }
                                 return Boolean(rowsField);
                             })()
+                            : settingKey === 'octave'
+                                ? (() => {
+                                    const next = clampNumber(
+                                        value,
+                                        OCTAVE_SHIFT_MIN,
+                                        OCTAVE_SHIFT_MAX,
+                                        DEFAULT_OCTAVE_SHIFT
+                                    );
+                                    const normalized = Math.round(next);
+                                    const octaveField = nodeEl?.querySelector(
+                                        `input.setting-field[data-port-index="${portIndex}"][data-setting-key="octave"]`
+                                    );
+                                    if (octaveField && octaveField !== document.activeElement) {
+                                        octaveField.value = String(normalized);
+                                    }
+                                    refreshFrequencyCopy();
+                                    return Boolean(octaveField);
+                                })()
                         : false;
     return handled;
 };

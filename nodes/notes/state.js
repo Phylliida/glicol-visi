@@ -10,6 +10,9 @@ import {
     DEFAULT_NOTE_COL_HEIGHT,
     DEFAULT_NOTE_CONTAINER_WIDTH,
     DEFAULT_NOTE_BUTTON_SCALE,
+    DEFAULT_OCTAVE_SHIFT,
+    OCTAVE_SHIFT_MIN,
+    OCTAVE_SHIFT_MAX,
     resolveTuningValue,
     resolveModeValue,
     resolveTonicValue,
@@ -25,6 +28,10 @@ import {
 
 const FREQ_INPUT_PORT_INDEX = 1;
 const isFreqEnabled = (node) => node?.settings?.freqEnabled !== false;
+const normalizeOctaveShift = (value, fallback = DEFAULT_OCTAVE_SHIFT) => {
+    const clamped = clampNumber(value, OCTAVE_SHIFT_MIN, OCTAVE_SHIFT_MAX, fallback);
+    return Number.isFinite(clamped) ? Math.round(clamped) : fallback;
+};
 
 const getModeDegreeCount = (modeId, context = {}) => {
     const modeSets = TuningUtils.modeSetsCache;
@@ -82,6 +89,7 @@ const getOutputValue = (node, portIndex, context = {}) => {
         );
     }
     if (portIndex === 6) return isFreqEnabled(node) ? 1 : 0;
+    if (portIndex === 7) return normalizeOctaveShift(node.settings?.octave, DEFAULT_OCTAVE_SHIFT);
     return node.value;
 };
 
@@ -98,6 +106,7 @@ const ensureSettings = (node, context = {}) => {
     if (node.settings.freqEnabled === undefined) {
         node.settings.freqEnabled = true;
     }
+    node.settings.octave = normalizeOctaveShift(node.settings.octave, DEFAULT_OCTAVE_SHIFT);
     const inferredRows = clampNumber(inferDefaultRows(node, context), 1, 32, DEFAULT_NOTE_ROWS);
     const configuredRows =
         node.settings.rows !== undefined && node.settings.rows !== ''
@@ -140,6 +149,9 @@ const resolveIncomingValue = (node, settingKey, incoming, context = {}) => {
             DEFAULT_NOTE_ROWS
         );
         return clampNumber(incoming, 1, 32, fallback);
+    }
+    if (settingKey === 'octave') {
+        return normalizeOctaveShift(incoming, normalizeOctaveShift(node?.settings?.octave, DEFAULT_OCTAVE_SHIFT));
     }
     return incoming;
 };

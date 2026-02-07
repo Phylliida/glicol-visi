@@ -1,4 +1,4 @@
-import { DEFAULT_TUNING, DEFAULT_TONIC } from './constants.js';
+import { DEFAULT_TUNING, DEFAULT_TONIC, DEFAULT_OCTAVE_SHIFT } from './constants.js';
 import { getInputDefinitions } from '../../node-lib.js';
 import { NOTES_CONFIG } from './config.js';
 import { getNode } from './helpers.js';
@@ -31,6 +31,7 @@ const renderHeaderExtras = (node, context = {}) => {
         current.settings.tuning = DEFAULT_TUNING;
         current.settings.mode = '';
         current.settings.tonic = '';
+        current.settings.octave = DEFAULT_OCTAVE_SHIFT;
         current.settings.hideModeTonic = true;
         current.value = DEFAULT_TUNING;
 

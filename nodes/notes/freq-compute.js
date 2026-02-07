@@ -3,6 +3,10 @@ import {
     DEFAULT_TUNING,
     DEFAULT_TONIC,
     DEFAULT_NOTATION,
+    DEFAULT_OCTAVE_SHIFT,
+    OCTAVE_SHIFT_MIN,
+    OCTAVE_SHIFT_MAX,
+    clampNumber,
     resolveTuningValue,
     getModeSets,
     tuningMetaCache
@@ -209,6 +213,11 @@ const resolveTonic = (raw) => {
     return Math.max(0, n);
 };
 
+const resolveOctaveShift = (raw) => {
+    const clamped = clampNumber(raw, OCTAVE_SHIFT_MIN, OCTAVE_SHIFT_MAX, DEFAULT_OCTAVE_SHIFT);
+    return Number.isFinite(clamped) ? Math.round(clamped) : DEFAULT_OCTAVE_SHIFT;
+};
+
 const mapNoteIndexToDegree = (index, modeDegrees, tuningDegreeCount) => {
     const numeric = Number(index);
     const safeIndex = Number.isFinite(numeric) ? Math.max(0, Math.floor(numeric)) : 0;
@@ -223,7 +232,7 @@ const mapNoteIndexToDegree = (index, modeDegrees, tuningDegreeCount) => {
     return base + cycle * tuningDegreeCount;
 };
 
-const degreeToFrequency = (degree, tonic, tuningData) => {
+const degreeToFrequency = (degree, tonic, tuningData, octaveShift = DEFAULT_OCTAVE_SHIFT) => {
     const steps = Array.isArray(tuningData?.steps) && tuningData.steps.length ? tuningData.steps : [1];
     const stepCount = steps.length;
     const period = Number.isFinite(tuningData?.period) && tuningData.period > 0 ? tuningData.period : 2;
@@ -232,7 +241,7 @@ const degreeToFrequency = (degree, tonic, tuningData) => {
     const periodShift = Math.floor(absoluteDegree / stepCount);
     const stepRatio = Number(steps[stepIndex]);
     const safeRatio = Number.isFinite(stepRatio) && stepRatio > 0 ? stepRatio : 1;
-    return BASE_A_FREQ * safeRatio * Math.pow(period, periodShift);
+    return BASE_A_FREQ * safeRatio * Math.pow(period, periodShift + octaveShift);
 };
 
 const formatFrequency = (value) => {
@@ -360,12 +369,13 @@ const computeFrequencyNotation = (node, context = {}) => {
     const tuningData = getTuningDataSync(tuningPath, node?.id, context);
     const modeDegrees = getModeDegrees(node, context);
     const tonic = resolveTonic(node?.settings?.tonic);
+    const octaveShift = resolveOctaveShift(node?.settings?.octave);
     const tuningDegreeCount =
         Array.isArray(tuningData?.steps) && tuningData.steps.length ? tuningData.steps.length : 12;
 
     const mapFilledValue = (rawIndex) => {
         const degree = mapNoteIndexToDegree(rawIndex, modeDegrees, tuningDegreeCount);
-        const freq = degreeToFrequency(degree, tonic, tuningData);
+        const freq = degreeToFrequency(degree, tonic, tuningData, octaveShift);
         return formatFrequency(freq);
     };
 

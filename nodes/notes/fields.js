@@ -4,6 +4,9 @@ import {
     DEFAULT_MODE,
     DEFAULT_TONIC,
     DEFAULT_NOTE_ROWS,
+    DEFAULT_OCTAVE_SHIFT,
+    OCTAVE_SHIFT_MIN,
+    OCTAVE_SHIFT_MAX,
     TONIC_OPTIONS,
     clampNumber,
     clampTonicToCount,
@@ -506,10 +509,57 @@ const buildRowsField = ({ node, setting, portIndex, connected, context }) => {
     return wrapper;
 };
 
+const buildOctaveField = ({ node, setting, portIndex, connected, context }) => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'rows-setting-controls';
+
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.step = '1';
+    input.min = String(OCTAVE_SHIFT_MIN);
+    input.max = String(OCTAVE_SHIFT_MAX);
+    input.className = 'setting-field';
+    input.dataset.portIndex = portIndex;
+    input.dataset.settingKey = setting.settingKey ?? setting.key;
+    input.disabled = connected;
+    if (setting.title) input.title = setting.title;
+    input.value = String(
+        Math.round(
+            clampNumber(node.settings?.octave, OCTAVE_SHIFT_MIN, OCTAVE_SHIFT_MAX, DEFAULT_OCTAVE_SHIFT)
+        )
+    );
+
+    input.addEventListener('mousedown', (evt) => evt.stopPropagation());
+    input.addEventListener('click', (evt) => evt.stopPropagation());
+    input.addEventListener('input', () => {
+        const current = getNode(context, node.id);
+        if (!current) return;
+        const next = clampNumber(
+            input.value,
+            OCTAVE_SHIFT_MIN,
+            OCTAVE_SHIFT_MAX,
+            clampNumber(current.settings?.octave, OCTAVE_SHIFT_MIN, OCTAVE_SHIFT_MAX, DEFAULT_OCTAVE_SHIFT)
+        );
+        const normalized = Math.round(next);
+        input.value = String(normalized);
+        current.settings.octave = normalized;
+        refreshFrequencyCopyForNode(current.id);
+        if (context.propagateValuesFrom) context.propagateValuesFrom(current.id);
+        if (context.updateCodePanel) context.updateCodePanel();
+        if (context.autoSave) context.autoSave();
+    });
+
+    wrapper.append(input);
+    return wrapper;
+};
+
 const renderSettingField = ({ node, setting, portIndex, connected, context }) => {
     const settingKey = setting.settingKey ?? setting.key;
     if (settingKey === 'rows') {
         return buildRowsField({ node, setting, portIndex, connected, context });
+    }
+    if (settingKey === 'octave') {
+        return buildOctaveField({ node, setting, portIndex, connected, context });
     }
     if (settingKey === 'tuning') {
         return buildTuningField({ node, setting, portIndex, connected, context });
@@ -526,4 +576,4 @@ const renderSettingField = ({ node, setting, portIndex, connected, context }) =>
     return null;
 };
 
-export { buildTuningField, buildModeField, buildTonicField, buildRowsField, renderSettingField };
+export { buildTuningField, buildModeField, buildTonicField, buildRowsField, buildOctaveField, renderSettingField };
