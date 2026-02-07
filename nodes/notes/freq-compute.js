@@ -150,6 +150,7 @@ const scheduleNodeRefresh = (promise, nodeId, context, token) => {
             if (nodes && typeof nodes.has === 'function' && !nodes.has(nodeId)) return;
             context.propagateValuesFrom(nodeId);
             if (typeof context.updateCodePanel === 'function') context.updateCodePanel();
+            if (typeof context.refreshNodeUi === 'function') context.refreshNodeUi(nodeId);
         })
         .finally(() => {
             pendingRefreshes.delete(key);

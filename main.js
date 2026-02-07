@@ -111,12 +111,26 @@ const updateSettingFieldDom = (nodeId, portIndex, value) => {
     }
 };
 
+const refreshNodeUi = (nodeId) => {
+    const node = state.nodes.get(nodeId);
+    if (!node) return;
+    const config = getNodeConfig(node.type);
+    if (!config) return;
+    ensureNodeSettings(node);
+    const inputDefs = getInputDefinitions(config);
+    inputDefs.forEach((def, portIndex) => {
+        if (!def?.settingKey) return;
+        updateSettingFieldDom(nodeId, portIndex, node.settings?.[def.settingKey]);
+    });
+};
+
 function getNodeContext() {
     return {
         state,
         render,
         renderConnections: renderConnectionsLayer,
         propagateValuesFrom,
+        refreshNodeUi,
         updateCodePanel,
         autoSave,
         hasIncomingConnection,

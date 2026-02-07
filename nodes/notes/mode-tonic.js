@@ -307,8 +307,14 @@ const updateTonicField = (nodeId, portIndex, rawValue, context = {}) => {
     );
     select.value = String(currentVal);
 
-    if (!connected) {
-        node.settings[settingKey] = currentVal;
+    if (!connected && settingKey && node?.settings) {
+        const previousValue = node.settings[settingKey];
+        if (previousValue !== currentVal) {
+            node.settings[settingKey] = currentVal;
+            if (context.updateCodePanel) context.updateCodePanel();
+            if (context.propagateValuesFrom) context.propagateValuesFrom(node.id);
+            if (context.autoSave) context.autoSave();
+        }
     }
 
     select.disabled = connected || !options.length;
