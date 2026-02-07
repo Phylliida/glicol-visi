@@ -49,13 +49,14 @@ const applyModeTonicVisibility = (nodeId, context = {}, opts = {}) => {
         el.style.display = hidden ? 'none' : '';
     });
 
-    const toggle = nodeEl.querySelector('.mode-tonic-toggle input[type="checkbox"]');
+    const toggle = nodeEl.querySelector('.mode-tonic-visibility-toggle input[type="checkbox"]');
     if (toggle) {
         toggle.checked = !hidden;
         toggle.disabled = forceHide;
     }
 
     alignOutputsToInputs(nodeEl);
+    if (context.renderConnections) context.renderConnections();
 };
 
 const refreshModeAndTonicForNode = (nodeId, context = {}) => {
@@ -317,7 +318,7 @@ const updateTonicField = (nodeId, portIndex, rawValue, context = {}) => {
 
 const buildModeTonicToggle = (node, context = {}) => {
     const toggleWrap = document.createElement('label');
-    toggleWrap.className = 'mode-tonic-toggle';
+    toggleWrap.className = 'mode-tonic-toggle mode-tonic-visibility-toggle';
     const toggle = document.createElement('input');
     toggle.type = 'checkbox';
     toggle.checked = !node.settings?.hideModeTonic;

@@ -758,6 +758,7 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
         alignEndBubble(board);
         updateFloatingControls();
         alignOutputsToInputs(nodeEl);
+        if (context.renderConnections) context.renderConnections();
     };
 
     const nodeObserver =

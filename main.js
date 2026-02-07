@@ -109,6 +109,7 @@ function getNodeContext() {
     return {
         state,
         render,
+        renderConnections: renderConnectionsLayer,
         propagateValuesFrom,
         updateCodePanel,
         autoSave,
@@ -469,6 +470,39 @@ const createConnection = (conn, fromPos, toPos) => {
     return group;
 };
 
+const renderConnectionsLayer = () => {
+    const connectionsLayer = document.getElementById('connections-layer');
+    if (!connectionsLayer) return;
+    connectionsLayer.innerHTML = '';
+
+    // Render persisted connections
+    for (const conn of state.connections.values()) {
+        const fromPos = getPortPosition(conn.fromNodeId, 'output', conn.fromPortIndex);
+        const toPos = getPortPosition(conn.toNodeId, 'input', conn.toPortIndex);
+        const connEl = createConnection(conn, fromPos, toPos);
+        connEl.addEventListener('click', (e) => {
+            e.stopPropagation();
+            state.connections.delete(conn.id);
+            render();
+            autoSave();
+        });
+        connectionsLayer.appendChild(connEl);
+    }
+
+    // Render in-progress drag wire
+    if (state.connectingPort && state.tempConnectionEnd) {
+        const fromPos = getPortPosition(
+            state.connectingPort.nodeId,
+            state.connectingPort.portType,
+            state.connectingPort.portIndex
+        );
+        const tempPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        tempPath.classList.add('temp-connection');
+        tempPath.setAttribute('d', calculatePath(fromPos, state.tempConnectionEnd));
+        connectionsLayer.appendChild(tempPath);
+    }
+};
+
 // ============================================================================
 // SIDE PANEL
 // ============================================================================
@@ -619,9 +653,8 @@ function render() {
         connectionsLayer.style.transformOrigin = '0 0';
     }
 
-    // Clear
+    // Clear nodes; connections are redrawn after nodes are mounted/aligned.
     nodesLayer.innerHTML = '';
-    connectionsLayer.innerHTML = '';
 
     // Render nodes
     for (const node of state.nodes.values()) {
@@ -635,32 +668,8 @@ function render() {
         afterRenderForType(node, nodeEl, context);
     }
 
-    // Render connections
-    for (const conn of state.connections.values()) {
-        const fromPos = getPortPosition(conn.fromNodeId, 'output', conn.fromPortIndex);
-        const toPos = getPortPosition(conn.toNodeId, 'input', conn.toPortIndex);
-        const connEl = createConnection(conn, fromPos, toPos);
-        connEl.addEventListener('click', (e) => {
-            e.stopPropagation();
-            state.connections.delete(conn.id);
-            render();
-            autoSave();
-        });
-        connectionsLayer.appendChild(connEl);
-    }
-
-    // Render temp connection
-    if (state.connectingPort && state.tempConnectionEnd) {
-        const fromPos = getPortPosition(
-            state.connectingPort.nodeId,
-            state.connectingPort.portType,
-            state.connectingPort.portIndex
-        );
-        const tempPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        tempPath.classList.add('temp-connection');
-        tempPath.setAttribute('d', calculatePath(fromPos, state.tempConnectionEnd));
-        connectionsLayer.appendChild(tempPath);
-    }
+    // Render connections after notes-specific output alignment hooks run.
+    renderConnectionsLayer();
 
     // Visual states
     if (state.draggedNode) {
