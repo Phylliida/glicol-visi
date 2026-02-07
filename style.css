@@ -461,6 +461,15 @@ body {
     width: 100%;
 }
 
+/* Allow shifted output rows to overlap visually without blocking nearby ports. */
+.outputs .port-container {
+    pointer-events: none;
+}
+
+.outputs .port-container .port {
+    pointer-events: auto;
+}
+
 .setting-field {
     background: #2f2f2f;
     border: 1px solid #555;
