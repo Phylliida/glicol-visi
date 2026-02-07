@@ -55,7 +55,8 @@ const state = {
     connectingPort: null,
     tempConnectionEnd: null,
     resizing: null,
-    nodeResizing: null
+    nodeResizing: null,
+    autoUpdateOnEdit: true
 };
 
 const screenToWorld = (clientX, clientY) => {
@@ -650,8 +651,13 @@ const updateCodePanel = () => {
         .map(getNodeCodeText)
         .join('\n');
 
+    let codeChanged = false;
     if (strudelEditor.getAttribute('code') !== codeText) {
         strudelEditor.setAttribute('code', codeText);
+        codeChanged = true;
+    }
+    if (codeChanged) {
+        queueMicrotask(() => requestAutoUpdate());
     }
 
     // The strudel component renders into a sibling container; ensure it fills the panel.
@@ -664,6 +670,45 @@ const updateCodePanel = () => {
 };
 
 const getStrudelRepl = () => document.querySelector('strudel-editor')?.editor;
+let updateEvaluateInFlight = false;
+let pendingAutoUpdate = false;
+
+const runUpdateAction = async () => {
+    const repl = getStrudelRepl();
+    if (!repl) return;
+    await repl.evaluate(false);
+};
+
+const runAutoUpdate = async () => {
+    if (updateEvaluateInFlight) {
+        return;
+    }
+    updateEvaluateInFlight = true;
+    try {
+        while (state.autoUpdateOnEdit && pendingAutoUpdate) {
+            pendingAutoUpdate = false;
+            await runUpdateAction();
+        }
+    } finally {
+        updateEvaluateInFlight = false;
+    }
+};
+
+const requestAutoUpdate = () => {
+    if (!state.autoUpdateOnEdit) return;
+    pendingAutoUpdate = true;
+    void runAutoUpdate();
+};
+
+const isStrudelCodeInputEvent = (event) => {
+    const path = event.composedPath?.() ?? [];
+    return path.some((entry) => {
+        if (!(entry instanceof HTMLElement)) return false;
+        if (entry.classList?.contains('cm-content')) return true;
+        if (entry.id === 'code') return true;
+        return false;
+    });
+};
 
 // ============================================================================
 // RENDERING
@@ -1070,6 +1115,22 @@ const init = async () => {
             document.body.style.cursor = 'col-resize';
             e.preventDefault();
         });
+
+        codePanel.addEventListener('input', (event) => {
+            if (!isStrudelCodeInputEvent(event)) return;
+            requestAutoUpdate();
+        });
+    }
+
+    const autoUpdateToggle = document.getElementById('auto-update-toggle');
+    if (autoUpdateToggle) {
+        autoUpdateToggle.checked = state.autoUpdateOnEdit;
+        autoUpdateToggle.addEventListener('change', (e) => {
+            state.autoUpdateOnEdit = Boolean(e.target.checked);
+            if (!state.autoUpdateOnEdit) {
+                pendingAutoUpdate = false;
+            }
+        });
     }
 
     initNodeTypes(getNodeContext());
@@ -1109,9 +1170,7 @@ const init = async () => {
     });
 
     document.getElementById('update-btn').addEventListener('click', async () => {
-        const repl = getStrudelRepl();
-        if (!repl) return;
-        await repl.evaluate(false);
+        await runUpdateAction();
     });
 
     // Load from URL or create demo nodes

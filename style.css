@@ -151,6 +151,20 @@ body {
     padding: 0.75rem;
 }
 
+.auto-update-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-left: auto;
+    font-size: 0.85rem;
+    color: #c7d9f3;
+    user-select: none;
+}
+
+.auto-update-toggle input {
+    cursor: pointer;
+}
+
 .panel-header {
     padding: 0.75rem;
     border-bottom: 1px solid #333;
