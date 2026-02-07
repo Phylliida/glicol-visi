@@ -24,6 +24,7 @@ import {
 } from './freq-compute.js';
 
 const FREQ_INPUT_PORT_INDEX = 1;
+const isFreqEnabled = (node) => node?.settings?.freqEnabled !== false;
 
 const getModeDegreeCount = (modeId, context = {}) => {
     const modeSets = TuningUtils.modeSetsCache;
@@ -60,6 +61,7 @@ const getOutputValue = (node, portIndex, context = {}) => {
     if (portIndex === 2) return node.settings?.tonic === '' ? '' : String(node.settings?.tonic ?? '');
     if (portIndex === 3) return renderNotesExpression(node.settings?.notes ?? DEFAULT_NOTATION);
     if (portIndex === 4) {
+        if (!isFreqEnabled(node)) return '';
         const hasFreqIncoming =
             typeof context?.hasIncomingConnection === 'function'
                 ? context.hasIncomingConnection(node.id, FREQ_INPUT_PORT_INDEX)
@@ -79,6 +81,7 @@ const getOutputValue = (node, portIndex, context = {}) => {
             DEFAULT_NOTE_ROWS
         );
     }
+    if (portIndex === 6) return isFreqEnabled(node) ? 1 : 0;
     return node.value;
 };
 
@@ -91,6 +94,9 @@ const ensureSettings = (node, context = {}) => {
     }
     if (node.settings.freq === undefined) {
         node.settings.freq = node.settings.notes;
+    }
+    if (node.settings.freqEnabled === undefined) {
+        node.settings.freqEnabled = true;
     }
     const inferredRows = clampNumber(inferDefaultRows(node, context), 1, 32, DEFAULT_NOTE_ROWS);
     const configuredRows =

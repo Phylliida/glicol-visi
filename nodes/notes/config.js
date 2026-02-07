@@ -2,7 +2,7 @@ const NOTES_CONFIG = {
     type: 'notes',
     name: 'Notes',
     inputs: [],
-    outputs: ['tuning', 'mode', 'tonic', 'notes', 'freq', 'rows'],
+    outputs: ['tuning', 'mode', 'tonic', 'notes', 'freq', 'rows', 'freq?'],
     settings: [
         { key: 'notes', label: 'notes', title: 'Strudel notation' },
         { key: 'freq', label: 'freq', title: 'freq' },

@@ -197,12 +197,39 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
     notationCopyInput.readOnly = true;
     notationCopyInput.tabIndex = -1;
     const getCurrentNode = () => context.state?.nodes?.get(node.id) ?? node;
+    const isFreqEnabled = (current = getCurrentNode()) => current?.settings?.freqEnabled !== false;
     const refreshFrequencyCopy = () => {
         const current = getCurrentNode();
+        if (!isFreqEnabled(current)) {
+            notationCopyInput.value = '';
+            return;
+        }
         notationCopyInput.value = renderFreqExpression(
             computeFrequencyNotation(current, context)
         );
     };
+    const freqToggleWrap = document.createElement('label');
+    freqToggleWrap.className = 'mode-tonic-toggle freq-output-toggle';
+    freqToggleWrap.addEventListener('mousedown', (e) => e.stopPropagation());
+    freqToggleWrap.addEventListener('click', (e) => e.stopPropagation());
+    const freqToggle = document.createElement('input');
+    freqToggle.type = 'checkbox';
+    freqToggle.checked = isFreqEnabled();
+    freqToggle.setAttribute('aria-label', 'Enable freq output');
+    freqToggle.addEventListener('mousedown', (e) => e.stopPropagation());
+    freqToggle.addEventListener('click', (e) => e.stopPropagation());
+    freqToggle.addEventListener('change', () => {
+        const current = getCurrentNode();
+        if (!current?.settings) return;
+        current.settings.freqEnabled = freqToggle.checked;
+        refreshFrequencyCopy();
+        if (context.propagateValuesFrom) context.propagateValuesFrom(current.id);
+        if (context.updateCodePanel) context.updateCodePanel();
+        if (context.autoSave) context.autoSave();
+    });
+    const freqToggleText = document.createElement('span');
+    freqToggleText.textContent = 'freq';
+    freqToggleWrap.append(freqToggle, freqToggleText);
     notationInput.addEventListener('mousedown', (e) => e.stopPropagation());
     notationInput.addEventListener('click', (e) => e.stopPropagation());
     notationInput.addEventListener('focus', () => {
@@ -226,13 +253,13 @@ const createNotesUi = ({ node, setting, portIndex, connected, context }) => {
                 ...current,
                 settings: { ...current.settings, [setting.settingKey]: rawNotation }
             };
-            notationCopyInput.value = renderFreqExpression(
-                computeFrequencyNotation(previewNode, context)
-            );
+            notationCopyInput.value = isFreqEnabled(current)
+                ? renderFreqExpression(computeFrequencyNotation(previewNode, context))
+                : '';
         }
         applyParsedBoard(parsed.columns, true, { preserveRows: true });
     });
-    notationRow.append(notationInput, notationCopyInput);
+    notationRow.append(notationInput, notationCopyInput, freqToggleWrap);
 
     root.append(boardShell, notationRow);
 

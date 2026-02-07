@@ -4,6 +4,7 @@ import { NOTES_CONFIG } from './config.js';
 const getNode = (context, nodeId) => context?.state?.nodes?.get(nodeId);
 const hasIncoming = (context, nodeId, portIndex) =>
     context?.hasIncomingConnection ? context.hasIncomingConnection(nodeId, portIndex) : false;
+const FREQ_TOGGLE_OUTPUT_NUDGE_PX = 30;
 
 const alignOutputsToInputs = (nodeEl) => {
     if (!nodeEl) return;
@@ -52,6 +53,23 @@ const alignOutputsToInputs = (nodeEl) => {
             else orderedOutputs.push(freqOutput);
         }
     }
+
+    const insertOutputAfterKey = (anchorKey, keyToInsert) => {
+        const anchorRow = outputByKey.get(anchorKey);
+        const insertRow = outputByKey.get(keyToInsert);
+        if (!insertRow) return;
+
+        const existingIdx = orderedOutputs.indexOf(insertRow);
+        if (existingIdx >= 0) orderedOutputs.splice(existingIdx, 1);
+
+        const anchorIdx = anchorRow ? orderedOutputs.indexOf(anchorRow) : -1;
+        if (anchorIdx >= 0) orderedOutputs.splice(anchorIdx + 1, 0, insertRow);
+        else orderedOutputs.push(insertRow);
+    };
+
+    // Keep freq? directly below freq regardless of output declaration order.
+    insertOutputAfterKey('freq', 'freq?');
+
     outputs.forEach((outRow) => {
         if (!orderedOutputs.includes(outRow)) orderedOutputs.push(outRow);
     });
@@ -81,6 +99,8 @@ const alignOutputsToInputs = (nodeEl) => {
 
     let shiftAfterPinnedFreq = 0;
     let pinnedFreqSeen = false;
+    let shiftAfterFreqToggle = 0;
+    let freqToggleSeen = false;
 
     orderedOutputs.forEach((outRow, idx) => {
         clearLabelExtras(outRow);
@@ -96,9 +116,14 @@ const alignOutputsToInputs = (nodeEl) => {
                 ? freqInputRow ?? inputs[idx]
                 : inputByKey.get(key) ?? inputs[idx];
 
-        if (pinnedFreqSeen && shiftAfterPinnedFreq > 0) {
+        const freqToggleNudge = key === 'freq?' && pinnedFreqSeen ? FREQ_TOGGLE_OUTPUT_NUDGE_PX : 0;
+        const cumulativeShift =
+            (pinnedFreqSeen && shiftAfterPinnedFreq > 0 ? shiftAfterPinnedFreq : 0) +
+            (freqToggleSeen && shiftAfterFreqToggle > 0 ? shiftAfterFreqToggle : 0) +
+            freqToggleNudge;
+        if (cumulativeShift > 0) {
             outRow.style.position = 'relative';
-            outRow.style.top = `-${shiftAfterPinnedFreq}px`;
+            outRow.style.top = `-${cumulativeShift}px`;
         }
 
         const height = inRow?.offsetHeight;
@@ -116,6 +141,12 @@ const alignOutputsToInputs = (nodeEl) => {
             outRow.style.top = `-${shift}px`;
             shiftAfterPinnedFreq = shift;
             pinnedFreqSeen = true;
+        }
+        if (key === 'freq?') {
+            const rowHeight = outRow.offsetHeight;
+            const shift = rowHeight + (Number.isFinite(outputsGap) ? outputsGap : 0);
+            shiftAfterFreqToggle = shift;
+            freqToggleSeen = true;
         }
         if (key === 'notes') {
             const copyOffset = getNotesCopyOffset(inRow);

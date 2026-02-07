@@ -294,6 +294,10 @@ body {
     border-radius: 1px;
 }
 
+.freq-output-toggle {
+    align-self: flex-start;
+}
+
 .mode-block {
     display: flex;
     flex-direction: column;
