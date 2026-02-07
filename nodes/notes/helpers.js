@@ -5,6 +5,7 @@ const getNode = (context, nodeId) => context?.state?.nodes?.get(nodeId);
 const hasIncoming = (context, nodeId, portIndex) =>
     context?.hasIncomingConnection ? context.hasIncomingConnection(nodeId, portIndex) : false;
 const FREQ_TOGGLE_OUTPUT_NUDGE_PX = 30;
+const NOTES_CLUSTER_NUDGE_PX = 35;
 
 const alignOutputsToInputs = (nodeEl) => {
     if (!nodeEl) return;
@@ -85,6 +86,18 @@ const alignOutputsToInputs = (nodeEl) => {
         });
     };
 
+    const setPortLabelNudge = (row, nudgePx = 0) => {
+        if (!row) return;
+        row.querySelectorAll(':scope > .port, :scope > .port-label').forEach((el) => {
+            el.style.position = '';
+            el.style.top = '';
+            if (nudgePx > 0) {
+                el.style.position = 'relative';
+                el.style.top = `-${nudgePx}px`;
+            }
+        });
+    };
+
     const getNotesCopyOffset = (inRow) => {
         const copyInput = inRow?.querySelector('.notes-notation-copy');
         if (!copyInput) return 0;
@@ -95,7 +108,12 @@ const alignOutputsToInputs = (nodeEl) => {
 
     inputs.forEach((inRow) => {
         clearLabelExtras(inRow);
+        setPortLabelNudge(inRow, 0);
     });
+
+    if (notesInputRow) {
+        setPortLabelNudge(notesInputRow, NOTES_CLUSTER_NUDGE_PX);
+    }
 
     let shiftAfterPinnedFreq = 0;
     let pinnedFreqSeen = false;
@@ -111,6 +129,8 @@ const alignOutputsToInputs = (nodeEl) => {
         outRow.style.top = '';
         const key = normalizeKey(outRow.querySelector('.port-label')?.textContent);
         const pinFreqToCopyLine = key === 'freq' && (freqInputHidden || !freqInputRow) && notesInputRow;
+        const clusterNudge =
+            key === 'notes' || key === 'freq' || key === 'freq?' ? NOTES_CLUSTER_NUDGE_PX : 0;
         const inRow =
             pinFreqToCopyLine
                 ? freqInputRow ?? inputs[idx]
@@ -142,6 +162,7 @@ const alignOutputsToInputs = (nodeEl) => {
             shiftAfterPinnedFreq = shift;
             pinnedFreqSeen = true;
         }
+        setPortLabelNudge(outRow, clusterNudge);
         if (key === 'freq?') {
             const rowHeight = outRow.offsetHeight;
             const shift = rowHeight + (Number.isFinite(outputsGap) ? outputsGap : 0);

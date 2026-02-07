@@ -15,6 +15,12 @@ import './nodes/text.js';
 import './nodes/code.js';
 import './nodes/notes.js';
 import './nodes/output.js';
+import {
+    renderNotesExpression,
+    renderFreqExpression,
+    unwrapNotesExpression,
+    unwrapFreqExpression
+} from './nodes/notes/freq-compute.js';
 
 // ============================================================================
 // UTILITIES
@@ -561,7 +567,32 @@ const updateCodePanel = () => {
     if (!strudelEditor) return;
 
     const componentMap = buildComponentMap();
-    const codeNodes = Array.from(state.nodes.values()).filter(node => node.type === 'code');
+    const codeNodes = Array.from(state.nodes.values()).filter(
+        (node) => node.type === 'code' || node.type === 'notes'
+    );
+
+    const getNodeCodeText = (node) => {
+        if (node.type === 'notes') {
+            const useFreq = node.settings?.freqEnabled !== false;
+            const portIndex = useFreq ? 4 : 3; // notes outputs: 3 => notes, 4 => freq
+            const outputExpr = getNodeOutputValueForType(node, portIndex, getNodeContext());
+            const selected = String(outputExpr ?? '');
+            if (useFreq) {
+                return renderFreqExpression(
+                    unwrapFreqExpression(unwrapNotesExpression(selected))
+                );
+            }
+            return renderNotesExpression(
+                unwrapNotesExpression(unwrapFreqExpression(selected))
+            );
+        }
+        const codeSetting = node.settings?.code;
+        const codeValue =
+            codeSetting !== undefined && codeSetting !== ''
+                ? codeSetting
+                : node.value ?? '';
+        return String(codeValue);
+    };
 
     const componentMeta = new Map();
     codeNodes.forEach(node => {
@@ -602,14 +633,7 @@ const updateCodePanel = () => {
             if (xDiff !== 0) return xDiff;
             return parseIdNumber(a.id) - parseIdNumber(b.id);
         })
-        .map(node => {
-            const codeSetting = node.settings?.code;
-            const codeValue =
-                codeSetting !== undefined && codeSetting !== ''
-                    ? codeSetting
-                    : node.value ?? '';
-            return String(codeValue);
-        })
+        .map(getNodeCodeText)
         .join('\n');
 
     if (strudelEditor.getAttribute('code') !== codeText) {
